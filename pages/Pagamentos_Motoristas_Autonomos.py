@@ -418,6 +418,22 @@ def verificar_guia_sem_telefone(id_gsheet, guia, lista_guias_com_telefone):
 
     return telefone_guia
 
+def verificar_apoios_duplicados(df_apoio_filtrado):
+    
+    df_apoios_duplicados = df_apoio_filtrado[df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True)]
+
+    df_apoios_duplicados['data_escala'] = pd.to_datetime(df_apoios_duplicados['Data da Escala']).dt.strftime('%d/%m/%Y') + ' | ' + df_apoios_duplicados['Escala']
+
+    if len(df_apoios_duplicados['data_escala'].unique().tolist())>0:
+
+        nomes_data_escalas = ', '.join(df_apoios_duplicados['data_escala'].unique().tolist())
+
+        st.error(f'As escalas {nomes_data_escalas} possuem escala auxiliar duplicada')
+
+        st.stop()
+        
+st.set_page_config(layout='wide')
+
 # Puxando dados do Phoenix da 'vw_payment_guide'
 
 if not 'df_escalas' in st.session_state:
@@ -425,8 +441,6 @@ if not 'df_escalas' in st.session_state:
     with st.spinner('Puxando dados do Phoenix...'):
 
         puxar_dados_phoenix()
-
-st.set_page_config(layout='wide')
 
 # Título da página
 
@@ -479,6 +493,8 @@ if data_final and data_inicial and gerar_mapa:
     df_apoio_filtrado = st.session_state.df_escalas[(~pd.isna(st.session_state.df_escalas['Apoio'])) & 
                                                     (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
                                                     (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
+
+    verificar_apoios_duplicados(df_apoio_filtrado)
     
     df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
                                             (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
