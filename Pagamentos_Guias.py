@@ -849,7 +849,7 @@ if data_final and data_inicial:
                                                     (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
                                                     (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index()
 
-            verificar_apoios_duplicados(df_apoio_filtrado)
+            verificar_apoios_duplicados(df_apoios)
             
             df_apoios = criar_colunas_escala_veiculo_mot_guia(df_apoios)
             
