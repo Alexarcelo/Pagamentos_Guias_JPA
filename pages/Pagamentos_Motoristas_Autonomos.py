@@ -3,7 +3,7 @@ import pandas as pd
 import mysql.connector
 import decimal
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from babel.numbers import format_currency
 import gspread 
 import requests
@@ -236,6 +236,112 @@ def criar_colunas_escala_veiculo_mot_guia(df_apoios):
         df_apoios['Apoio'].str.split(',', expand=True)
     
     return df_apoios
+
+def transformar_em_string(apoio):
+
+    return ', '.join(list(set(apoio.dropna())))
+
+def criar_df_apoios():
+
+    df_apoio_filtrado = st.session_state.df_escalas[(~pd.isna(st.session_state.df_escalas['Apoio'])) & (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
+                                                    (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
+    
+    df_apoio_filtrado = df_apoio_filtrado.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Motorista', 'Guia', 'Servico', 'Tipo de Servico', 'Modo'])\
+        .agg({'Apoio': transformar_em_string, 'Data | Horario Apresentacao': 'min'}).reset_index()
+
+    df_escalas_com_apoio = df_apoio_filtrado[(~df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True))].reset_index(drop=True)
+
+    df_escalas_com_apoio = criar_colunas_escala_veiculo_mot_guia(df_escalas_com_apoio)
+
+    df_escalas_com_apoio = df_escalas_com_apoio[df_escalas_com_apoio['Motorista Apoio'].str.contains('MOT AUT', na=False)].reset_index(drop=True)
+
+    df_apoios_group = df_escalas_com_apoio.groupby(['Escala Apoio', 'Veiculo Apoio', 'Motorista Apoio', 'Guia Apoio'])\
+        .agg({'Data da Escala': 'first', 'Data | Horario Apresentacao': 'first'}).reset_index()
+    
+    df_apoios_group = df_apoios_group[~df_apoios_group['Motorista Apoio'].str.contains('FARIAS|GIULIANO|NETO|JUNIOR')].reset_index(drop=True)
+
+    df_apoios_group = df_apoios_group.rename(columns={'Veiculo Apoio': 'Veículo', 'Motorista Apoio': 'Motorista', 'Guia Apoio': 'Guia', 'Escala Apoio': 'Escala'})
+
+    df_pag_apoios = pd.merge(df_apoios_group, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
+
+    lista_veiculos_sem_diaria = df_pag_apoios[pd.isna(df_pag_apoios['Valor'])]['Veículo'].unique().tolist()
+
+    df_pag_apoios = df_pag_apoios.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
+
+    df_pag_apoios['Servico']='APOIO'
+
+    df_pag_apoios = pd.merge(df_pag_apoios, st.session_state.df_regiao, on = 'Servico', how = 'left')
+
+    df_pag_apoios['Modo']='REGULAR'
+
+    df_pag_apoios['Tipo de Servico']='APOIO'
+
+    df_pag_apoios['Data | Horario Voo']=df_pag_apoios['Data | Horario Apresentacao']
+
+    df_pag_apoios = df_pag_apoios[['Escala', 'Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Veículo', 'Guia', 'Motorista', 'Data | Horario Voo', 
+                                'Data | Horario Apresentacao', 'Valor', 'Região']]
+
+    df_escalas_com_2_apoios = df_apoio_filtrado[(df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True))].reset_index(drop=True)
+
+    df_novo = pd.DataFrame(columns=['Escala', 'Veículo', 'Motorista', 'Guia', 'Data | Horario Apresentacao', 'Data da Escala'])
+
+    for index in range(len(df_escalas_com_2_apoios)):
+
+        data_escala = df_escalas_com_2_apoios.at[index, 'Data da Escala']
+
+        apoio_nome = df_escalas_com_2_apoios.at[index, 'Apoio']
+
+        data_h_apr = df_escalas_com_2_apoios.at[index, 'Data | Horario Apresentacao']
+
+        lista_apoios = apoio_nome.split(' | ')
+
+        for item in lista_apoios:
+
+            dict_replace = {'Escala Auxiliar: ': '', ' Veículo: ': '', ' Motorista: ': '', ' Guia: ': ''}
+
+            for old, new in dict_replace.items():
+
+                item = item.replace(old, new)
+                
+            lista_insercao = item.split(',')
+
+            contador = len(df_novo)
+
+            df_novo.at[contador, 'Escala'] = lista_insercao[0]
+
+            df_novo.at[contador, 'Veículo'] = lista_insercao[1]
+
+            df_novo.at[contador, 'Motorista'] = lista_insercao[2]
+
+            df_novo.at[contador, 'Guia'] = lista_insercao[3]
+
+            df_novo.at[contador, 'Data | Horario Apresentacao'] = data_h_apr
+
+            df_novo.at[contador, 'Data da Escala'] = data_escala
+
+    df_novo = df_novo[df_novo['Motorista'].str.contains('MOT AUT', na=False)].reset_index(drop=True)
+
+    df_novo = df_novo[~df_novo['Motorista'].str.contains('FARIAS|GIULIANO|NETO|JUNIOR')].reset_index(drop=True)
+
+    df_novo = pd.merge(df_novo, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
+
+    lista_veiculos_sem_diaria.extend(df_novo[pd.isna(df_novo['Valor'])]['Veículo'].unique().tolist())
+
+    df_novo = df_novo.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
+
+    df_novo['Servico']='APOIO'
+
+    df_novo = pd.merge(df_novo, st.session_state.df_regiao, on = 'Servico', how = 'left')
+
+    df_novo['Modo']='REGULAR'
+
+    df_novo['Tipo de Servico']='APOIO'
+
+    df_novo['Data | Horario Voo']=df_novo['Data | Horario Apresentacao']
+
+    df_pag_apoios = pd.concat([df_pag_apoios, df_novo], ignore_index=True)
+
+    return df_pag_apoios, lista_veiculos_sem_diaria
 
 def inserir_mapa_sheets(df_pag_final):
 
@@ -490,33 +596,13 @@ if data_final and data_inicial and gerar_mapa:
 
     puxar_regiao()
     
-    df_apoio_filtrado = st.session_state.df_escalas[(~pd.isna(st.session_state.df_escalas['Apoio'])) & 
-                                                    (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
-                                                    (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
+    df_pag_apoios, lista_veiculos_sem_diaria = criar_df_apoios()
 
-    verificar_apoios_duplicados(df_apoio_filtrado)
-    
     df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
                                             (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
                                             (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
     
-    
     verificar_servicos_regiao(df_filtrado, st.session_state.df_regiao)
-    
-    df_apoio_filtrado = criar_colunas_escala_veiculo_mot_guia(df_apoio_filtrado)
-
-    df_apoio_filtrado = df_apoio_filtrado[df_apoio_filtrado['Motorista Apoio'].str.contains('MOT AUT', na=False)].reset_index(drop=True)
-
-    df_apoios_group = df_apoio_filtrado.groupby(['Escala Apoio', 'Veiculo Apoio', 'Motorista Apoio', 'Guia Apoio'])\
-        .agg({'Data da Escala': 'first', 'Data | Horario Apresentacao': 'min'}).reset_index()
-
-    df_apoios_group = df_apoios_group[~df_apoios_group['Motorista Apoio'].str.contains('FARIAS|GIULIANO|NETO|JUNIOR')].reset_index(drop=True)
-
-    df_apoios_group = df_apoios_group.rename(columns={'Veiculo Apoio': 'Veículo'})
-
-    df_pag_apoios = pd.merge(df_apoios_group, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
-
-    lista_veiculos_sem_diaria = df_pag_apoios[pd.isna(df_pag_apoios['Valor'])]['Veículo'].unique().tolist()
 
     mask = df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER'])
 
@@ -572,27 +658,10 @@ if data_final and data_inicial and gerar_mapa:
     
     df_pag_geral = df_pag_geral.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
 
-    df_pag_apoios = df_pag_apoios.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
-
     df_pag_geral = df_pag_geral.apply(ajustar_data_horario, axis=1)
-
-    df_pag_apoios['Servico']='APOIO'
 
     df_pag_geral = pd.merge(df_pag_geral, st.session_state.df_regiao, on = 'Servico', how = 'left')
 
-    df_pag_apoios = pd.merge(df_pag_apoios, st.session_state.df_regiao, on = 'Servico', how = 'left')
-
-    df_pag_apoios['Modo']='REGULAR'
-
-    df_pag_apoios['Tipo de Servico']='APOIO'
-
-    df_pag_apoios['Data | Horario Voo']=df_pag_apoios['Data | Horario Apresentacao']
-
-    df_pag_apoios = df_pag_apoios.rename(columns={'Escala Apoio': 'Escala', 'Guia Apoio': 'Guia', 'Motorista Apoio': 'Motorista'})
-
-    df_pag_apoios = df_pag_apoios[['Escala', 'Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Veículo', 'Guia', 'Motorista', 'Data | Horario Voo', 
-                                'Data | Horario Apresentacao', 'Valor', 'Região']]
-    
     df_pag_concat = pd.concat([df_pag_geral, df_pag_apoios], ignore_index=True)
 
     df_pag_motoristas = df_pag_concat.groupby(['Data da Escala', 'Motorista']).agg({'Valor': 'max', 'Data | Horario Voo': 'max', 
@@ -603,7 +672,6 @@ if data_final and data_inicial and gerar_mapa:
     df_pag_motoristas['Apenas TRF/APOIO/ENTARDECER'] = ''
     df_pag_motoristas['Interestadual/Intermunicipal'] = ''
     df_pag_motoristas['Passeios sem Apoio'] = ''
-
 
     for index, value in df_pag_motoristas['Qtd. Serviços'].items():
 
