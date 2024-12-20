@@ -594,19 +594,92 @@ def puxar_dados_phoenix():
     
     st.session_state.df_escalas['Guia'] = st.session_state.df_escalas['Guia'].fillna('')
 
-def verificar_apoios_duplicados(df_apoio_filtrado):
+def transformar_em_string(apoio):
+
+    return ', '.join(list(set(apoio.dropna())))
+
+def criar_df_apoios():
+
+    df_apoio_filtrado = st.session_state.df_escalas[(~pd.isna(st.session_state.df_escalas['Apoio'])) & (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
+                                                    (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
     
-    df_apoios_duplicados = df_apoio_filtrado[df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True)]
+    df_apoio_filtrado = df_apoio_filtrado.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Motorista', 'Guia', 'Servico', 'Tipo de Servico', 'Modo'])\
+        .agg({'Apoio': transformar_em_string, 'Data | Horario Apresentacao': 'min'}).reset_index()
 
-    df_apoios_duplicados['data_escala'] = pd.to_datetime(df_apoios_duplicados['Data da Escala']).dt.strftime('%d/%m/%Y') + ' | ' + df_apoios_duplicados['Escala']
+    df_escalas_com_apoio = df_apoio_filtrado[(~df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True))].reset_index(drop=True)
 
-    if len(df_apoios_duplicados['data_escala'].unique().tolist())>0:
+    df_escalas_com_apoio = criar_colunas_escala_veiculo_mot_guia(df_escalas_com_apoio)
 
-        nomes_data_escalas = ', '.join(df_apoios_duplicados['data_escala'].unique().tolist())
+    df_apoios_group = df_escalas_com_apoio.groupby(['Escala Apoio', 'Veiculo Apoio', 'Motorista Apoio', 'Guia Apoio'])\
+        .agg({'Data da Escala': 'first', 'Data | Horario Apresentacao': 'first'}).reset_index()
 
-        st.error(f'As escalas {nomes_data_escalas} possuem escala auxiliar duplicada')
+    df_apoios_group = df_apoios_group.rename(columns={'Veiculo Apoio': 'Veiculo', 'Motorista Apoio': 'Motorista', 'Guia Apoio': 'Guia', 'Escala Apoio': 'Escala'})
 
-        st.stop()
+    df_apoios_group = preencher_colunas_df(df_apoios_group)
+
+    df_apoios_group = gerar_pag_motoguia(df_apoios_group)
+
+    df_apoios_group = criar_coluna_valor_total(df_apoios_group)
+
+    df_apoios_group = df_apoios_group.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
+
+    df_apoios_group = df_apoios_group[['Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Est. Origem', 'Veiculo', 'Motorista', 'Guia', 'Valor', 'Acréscimo Motoguia', 
+                                           'Desconto por Junção', 'Valor Total']]
+
+    df_escalas_com_2_apoios = df_apoio_filtrado[(df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True))].reset_index(drop=True)
+
+    df_novo = pd.DataFrame(columns=['Escala', 'Veiculo', 'Motorista', 'Guia', 'Data | Horario Apresentacao', 'Data da Escala'])
+
+    for index in range(len(df_escalas_com_2_apoios)):
+
+        data_escala = df_escalas_com_2_apoios.at[index, 'Data da Escala']
+
+        apoio_nome = df_escalas_com_2_apoios.at[index, 'Apoio']
+
+        data_h_apr = df_escalas_com_2_apoios.at[index, 'Data | Horario Apresentacao']
+
+        lista_apoios = apoio_nome.split(' | ')
+
+        for item in lista_apoios:
+
+            dict_replace = {'Escala Auxiliar: ': '', ' Veículo: ': '', ' Motorista: ': '', ' Guia: ': ''}
+
+            for old, new in dict_replace.items():
+
+                item = item.replace(old, new)
+                
+            lista_insercao = item.split(',')
+
+            contador = len(df_novo)
+
+            df_novo.at[contador, 'Escala'] = lista_insercao[0]
+
+            df_novo.at[contador, 'Veiculo'] = lista_insercao[1]
+
+            df_novo.at[contador, 'Motorista'] = lista_insercao[2]
+
+            df_novo.at[contador, 'Guia'] = lista_insercao[3]
+
+            df_novo.at[contador, 'Data | Horario Apresentacao'] = data_h_apr
+
+            df_novo.at[contador, 'Data da Escala'] = data_escala
+
+    df_novo = preencher_colunas_df(df_novo)
+
+    df_novo = gerar_pag_motoguia(df_novo)
+
+    df_novo = criar_coluna_valor_total(df_novo)
+
+    df_novo = df_novo.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
+
+    df_novo = df_novo[['Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Est. Origem', 'Veiculo', 'Motorista', 'Guia', 'Valor', 'Acréscimo Motoguia', 
+                                           'Desconto por Junção', 'Valor Total']]
+
+    df_apoios_group = pd.concat([df_apoios_group, df_novo], ignore_index=True)
+
+    df_apoios_group = df_apoios_group[df_apoios_group['Guia']!='null'].reset_index(drop=True)
+
+    return df_apoios_group
 
 st.set_page_config(layout='wide')
 
@@ -844,29 +917,8 @@ if data_final and data_inicial:
                                                              'Desconto por Junção', 'Valor Total']]
             
             df_pag_in_out_final['Est. Origem'] = ''
-
-            df_apoios = st.session_state.df_escalas[(~pd.isna(st.session_state.df_escalas['Apoio'])) & 
-                                                    (st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
-                                                    (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index()
-
-            verificar_apoios_duplicados(df_apoios)
-            
-            df_apoios = criar_colunas_escala_veiculo_mot_guia(df_apoios)
-            
-            df_apoios_group = df_apoios.groupby(['Escala Apoio', 'Veiculo Apoio', 'Motorista Apoio', 'Guia Apoio'])\
-                ['Data da Escala'].first().reset_index()
-            
-            df_apoios_group = preencher_colunas_df(df_apoios_group)
-
-            df_apoios_group = df_apoios_group.rename(columns={'Veiculo Apoio': 'Veiculo', 'Motorista Apoio': 'Motorista', 
-                                                              'Guia Apoio': 'Guia'})
-
-            df_apoios_group = gerar_pag_motoguia(df_apoios_group)
-
-            df_apoios_group = criar_coluna_valor_total(df_apoios_group)
-
-            df_pag_apoios = df_apoios_group[['Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Est. Origem', 'Veiculo', 
-                                             'Motorista', 'Guia', 'Valor', 'Acréscimo Motoguia', 'Desconto por Junção', 'Valor Total']]
+  
+            df_pag_apoios = criar_df_apoios()
             
             st.success('Mapas de pagamentos de Apoios gerados com sucesso!')
             
