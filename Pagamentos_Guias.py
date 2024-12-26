@@ -3,7 +3,7 @@ import pandas as pd
 import mysql.connector
 import decimal
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import timedelta, time
 from babel.numbers import format_currency
 import gspread 
 import requests
@@ -686,7 +686,7 @@ if data_final and data_inicial:
                 # Identificando voos diurnos e na madrugada
 
                 df_escalas_in_out['Diurno / Madrugada'] = df_escalas_in_out.apply(lambda row: 'MADRUGADA' if (row['Horario Apresentacao']<=time(4,0)) or 
-                                                                                (row['Horario Voo Mais Tarde']>=time(0) and row['Horario Voo Mais Tarde']<=time(4)) else 'DIURNO', axis=1)
+                                                                                  (row['Horario Voo Mais Tarde']<=time(4)) else 'DIURNO', axis=1)
                 
                 # Separando diurnos e madrugadas jpa e interestadual
 
