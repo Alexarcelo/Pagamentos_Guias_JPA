@@ -656,10 +656,10 @@ if data_final and data_inicial and gerar_mapa:
 
     # Puxando infos das planilhas
 
-    # with st.spinner('Puxando valores de diárias por veículo, ajudas de custo, passeios sem apoio'):
+    with st.spinner('Puxando valores de diárias por veículo, ajudas de custo, passeios sem apoio'):
 
-    #     puxar_infos_gdrive(st.session_state.id_gsheet, 'df_veiculo_categoria', 'BD - Veiculo Categoria', 'df_regiao', 'BD - Passeios | Interestaduais', 'df_passeios_sem_apoio', 
-    #                        'BD - Passeios sem Apoio')
+        puxar_infos_gdrive(st.session_state.id_gsheet, 'df_veiculo_categoria', 'BD - Veiculo Categoria', 'df_regiao', 'BD - Passeios | Interestaduais', 'df_passeios_sem_apoio', 
+                           'BD - Passeios sem Apoio')
 
     # Criando apoios e pegando lista de veículos no apoio que não tem valor de diária cadastrada
     
