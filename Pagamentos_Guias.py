@@ -206,15 +206,19 @@ def calcular_acrescimo_motoguia(df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tou
 
 def ajustar_pag_giuliano_junior_neto_tt(df):
 
-    mask_pag_giuliano_junior_herbet = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR BUGUEIRO - GUIA', 'HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & \
+    mask_pag_junior_herbet = (df['Guia'].isin(['JUNIOR BUGUEIRO - GUIA', 'HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & \
         ((df['Valor Total']<150) | (pd.isna(df['Valor Total'])))
     
-    df.loc[mask_pag_giuliano_junior_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
+    df.loc[mask_pag_junior_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
     mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
 
     df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
 
+    mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
+
+    df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+    
     return df
 
 def colunas_voos_mais_tarde_cedo(df_escalas_in_out):
@@ -298,14 +302,18 @@ def criar_coluna_valor_total(df):
 
 def ajustar_pag_giuliano_junior_neto_in_out(df):
 
-    mask_pag_giuliano_junior_herbet = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR BUGUEIRO - GUIA', 'HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & \
+    mask_pag_junior_herbet = (df['Guia'].isin(['JUNIOR BUGUEIRO - GUIA', 'HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & \
         ((df['Valor Total']<150) | (pd.isna(df['Valor Total'])))
     
-    df.loc[mask_pag_giuliano_junior_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
+    df.loc[mask_pag_junior_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
     mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
 
     df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
+
+    mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
+
+    df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
 
     return df
 
