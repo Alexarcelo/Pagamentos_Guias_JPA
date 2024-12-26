@@ -43,122 +43,51 @@ def gerar_df_phoenix(vw_name):
     df = df.applymap(lambda x: float(x) if isinstance(x, decimal.Decimal) else x)
     return df
 
-def ajustar_data_horario(row):
-    if ('BY NIGHT' in row['Servico']) or ('SÃO JOÃO' in row['Servico']) or \
-    ('CATAMARÃ DO FORRÓ' in row['Servico']):
-        row['Data | Horario Voo'] = row['Data | Horario Apresentacao'] + timedelta(days=1)
-        row['Data | Horario Voo'] = row['Data | Horario Voo'].replace(hour=1, minute=0, second=0)
-    return row
+def puxar_dados_phoenix():
 
-def verificar_acrescimo(row):
-    apr_time = row['Data | Horario Apresentacao']
-    voo_time = row['Data | Horario Voo']
+    st.session_state.df_escalas = gerar_df_phoenix('vw_payment_guide')
+
+    st.session_state.df_escalas = st.session_state.df_escalas[(st.session_state.df_escalas['Status do Servico']!='CANCELADO') & 
+                                                              (~pd.isna(st.session_state.df_escalas['Escala']))].reset_index(drop=True)
     
-    # Verifica se apr_time e voo_time não são NaT
-    if pd.notna(apr_time) and pd.notna(voo_time):
-        # Verifica se 'Data/Horário de Apr.' é antes das 17:00:00 e 'Data/Horário de Voo' é no dia seguinte
-        if ((apr_time.time() <= pd.Timestamp('18:00:00').time()) & (apr_time.time() >= pd.Timestamp('04:00:00').time())) & \
-        ((voo_time.date() == apr_time.date() + pd.Timedelta(days=1)) | (voo_time.time() >= pd.Timestamp('23:59:00').time())):
-            row['Acréscimo 50%'] = 'x'
-    return row
+    st.session_state.df_escalas['Data | Horario Apresentacao'] = pd.to_datetime(st.session_state.df_escalas['Data | Horario Apresentacao'], errors='coerce')
+    
+    st.session_state.df_escalas['Guia'] = st.session_state.df_escalas['Guia'].fillna('')
 
-def puxar_veiculo_categoria():
+def puxar_infos_gdrive(id_gsheet, nome_df_1, aba_1, nome_df_2, aba_2, nome_df_3, aba_3):
 
-    # GCP projeto onde está a chave credencial
     project_id = "grupoluck"
-
-    # ID da chave credencial do google.
     secret_id = "cred-luck-aracaju"
-
-    # Cria o cliente.
     secret_client = secretmanager.SecretManagerServiceClient()
-
     secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
     response = secret_client.access_secret_version(request={"name": secret_name})
-
     secret_payload = response.payload.data.decode("UTF-8")
-
     credentials_info = json.loads(secret_payload)
-
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-
-    # Use the credentials to authorize the gspread client
     credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
     client = gspread.authorize(credentials)
 
-    spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
+    spreadsheet = client.open_by_key(id_gsheet)
     
-    sheet = spreadsheet.worksheet('BD - Veiculo Categoria')
+    sheet = spreadsheet.worksheet(aba_1)
 
     sheet_data = sheet.get_all_values()
 
-    st.session_state.df_veiculo_categoria = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+    st.session_state[nome_df_1] = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
 
-    st.session_state.df_veiculo_categoria['Valor'] = pd.to_numeric(st.session_state.df_veiculo_categoria['Valor'], errors='coerce')
+    st.session_state[nome_df_1]['Valor'] = pd.to_numeric(st.session_state[nome_df_1]['Valor'], errors='coerce')
 
-def puxar_regiao():
-
-    # GCP projeto onde está a chave credencial
-    project_id = "grupoluck"
-
-    # ID da chave credencial do google.
-    secret_id = "cred-luck-aracaju"
-
-    # Cria o cliente.
-    secret_client = secretmanager.SecretManagerServiceClient()
-
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-
-    secret_payload = response.payload.data.decode("UTF-8")
-
-    credentials_info = json.loads(secret_payload)
-
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-
-    # Use the credentials to authorize the gspread client
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-    client = gspread.authorize(credentials)
-
-    spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
-    
-    sheet = spreadsheet.worksheet('BD - Passeios | Interestaduais')
+    sheet = spreadsheet.worksheet(aba_2)
 
     sheet_data = sheet.get_all_values()
 
-    st.session_state.df_regiao = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+    st.session_state[nome_df_2] = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
 
-def puxar_passeios_sem_apoio():
-
-    # GCP projeto onde está a chave credencial
-    project_id = "grupoluck"
-
-    # ID da chave credencial do google.
-    secret_id = "cred-luck-aracaju"
-
-    # Cria o cliente.
-    secret_client = secretmanager.SecretManagerServiceClient()
-
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-
-    secret_payload = response.payload.data.decode("UTF-8")
-
-    credentials_info = json.loads(secret_payload)
-
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-
-    # Use the credentials to authorize the gspread client
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-    client = gspread.authorize(credentials)
-
-    spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
-    
-    sheet = spreadsheet.worksheet('BD - Passeios sem Apoio')
+    sheet = spreadsheet.worksheet(aba_3)
 
     sheet_data = sheet.get_all_values()
 
-    st.session_state.df_passeios_sem_apoio = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+    st.session_state[nome_df_3] = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
 
 def verificar_servicos_regiao(df_servicos, df_regiao):
 
@@ -176,25 +105,14 @@ def verificar_servicos_regiao(df_servicos, df_regiao):
 
         df_add_excel['1'] = ''
 
-        # GCP projeto onde está a chave credencial
         project_id = "grupoluck"
-    
-        # ID da chave credencial do google.
         secret_id = "cred-luck-aracaju"
-    
-        # Cria o cliente.
         secret_client = secretmanager.SecretManagerServiceClient()
-    
         secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
         response = secret_client.access_secret_version(request={"name": secret_name})
-    
         secret_payload = response.payload.data.decode("UTF-8")
-    
         credentials_info = json.loads(secret_payload)
-    
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    
-        # Use the credentials to authorize the gspread client
         credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
         client = gspread.authorize(credentials)
         
@@ -219,6 +137,236 @@ def verificar_servicos_regiao(df_servicos, df_regiao):
         st.error('Serviços acima inseridos na aba BD - Passeios | Interestaduais. Por favor, informe a região de cada serviço na planilha e tente novamente')
 
         st.stop() 
+
+def preencher_data_hora_voo_tt(df_filtrado):
+
+    df_filtrado.loc[df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER']), 'Data Voo'] = \
+        df_filtrado.loc[df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER']), 'Data | Horario Apresentacao'].dt.date
+
+    df_filtrado.loc[df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER']), 'Horario Voo'] = \
+        df_filtrado.loc[df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER']), 'Data | Horario Apresentacao'].dt.time
+
+    df_filtrado = df_filtrado.rename(columns={'Veiculo': 'Veículo'})
+
+    df_filtrado['Horario Voo'] = pd.to_datetime(df_filtrado['Horario Voo'], format='%H:%M:%S').dt.time
+
+    df_filtrado['Data | Horario Voo'] = pd.to_datetime(df_filtrado['Data Voo'].astype(str) + ' ' + df_filtrado['Horario Voo'].astype(str))
+
+    return df_filtrado
+
+def verificar_veiculos_sem_diaria(lista_veiculos_sem_diaria, df_filtrado):
+
+    lista_veiculos_sem_diaria.extend(df_filtrado[pd.isna(df_filtrado['Valor'])]['Veículo'].unique().tolist())
+
+    if len(lista_veiculos_sem_diaria)>0:
+
+        nome_veiculos_sem_diaria = ', '.join(lista_veiculos_sem_diaria)
+
+        st.error(f'Os veículos {nome_veiculos_sem_diaria} não tem valor de diária cadastrada. Cadastre e tente novamente, por favor')
+
+        st.stop()
+
+def verificar_reservas_sem_voo(df_filtrado):
+
+    if len(df_filtrado[df_filtrado['Data Voo']==''])>0:
+
+        lista_reservas = ', '.join(df_filtrado[df_filtrado['Data Voo']=='']['Reserva'].unique().tolist())
+
+        df_filtrado.loc[df_filtrado['Data Voo']=='', 'Data Voo'] = df_filtrado['Data | Horario Apresentacao'].dt.date
+
+        df_filtrado.loc[pd.isna(df_filtrado['Horario Voo']), 'Horario Voo'] = df_filtrado['Data | Horario Apresentacao'].dt.time
+
+        st.error(f'As reservas {lista_reservas} estão sem voo no IN ou OUT. O robô vai gerar os pagamentos, criando um horário fictício para o voo')
+
+def ajustar_data_escala_voos_madrugada(df_filtrado):
+
+    mask_in_out_voos_madrugada = (df_filtrado['Tipo de Servico'].isin(['IN', 'OUT'])) & ((df_filtrado['Horario Voo']<=time(4,0)) | (df_filtrado['Data | Horario Apresentacao'].dt.time<=time(4,0)))
+
+    df_filtrado.loc[mask_in_out_voos_madrugada, 'Data da Escala'] = df_filtrado.loc[mask_in_out_voos_madrugada, 'Data da Escala'] - timedelta(days=1)
+
+    return df_filtrado
+
+def agrupar_escalas(df_filtrado):
+
+    df_pag_geral = df_filtrado.groupby(['Escala', 'Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Veículo', 'Motorista'])\
+        .agg({'Data | Horario Voo': 'max', 'Data | Horario Apresentacao': 'max', 'Valor': 'max', 'Guia': 'first'}).reset_index()
+    
+    df_pag_geral = df_pag_geral.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
+
+    return df_pag_geral
+
+def ajustar_data_tt_madrugada(df_pag_geral):
+
+    mask_tt_madrugada = (df_pag_geral['Servico'].str.upper().str.contains('BY NIGHT|SÃO JOÃO|CATAMARÃ DO FORRÓ')) & (df_pag_geral['Tipo de Servico']=='TOUR')
+
+    df_pag_geral.loc[mask_tt_madrugada, 'Data | Horario Voo'] = (df_pag_geral.loc[mask_tt_madrugada, 'Data | Horario Apresentacao'] + timedelta(days=1))\
+        .apply(lambda dt: dt.replace(hour=1, minute=0, second=0))
+
+    return df_pag_geral
+
+def transformar_lista(x):
+
+    return list(x)
+
+def verificar_trf_apoio_ent_interestadual(df_pag_concat):
+
+    df_pag_motoristas = df_pag_concat.groupby(['Data da Escala', 'Motorista']).agg({'Valor': 'max', 'Data | Horario Voo': 'max', 'Data | Horario Apresentacao': 'min', 'Modo': 'count'})\
+        .reset_index()
+    
+    df_pag_motoristas = df_pag_motoristas.rename(columns = {'Modo': 'Qtd. Serviços'})
+
+    df_pag_motoristas[['Apenas TRF/APOIO/ENTARDECER', 'Interestadual/Intermunicipal', 'Passeios sem Apoio']] = ''
+
+    for index, value in df_pag_motoristas['Qtd. Serviços'].items():
+
+        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
+        
+        motorista = df_pag_motoristas.at[index, 'Motorista']
+        
+        df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
+        
+        # Deduzindo da Qtd Serviços as junções de OUT e IN, ou seja, contabilizando cada junção como apenas 1 serviço
+        
+        df_ref_trf = df_ref[(df_ref['Tipo de Servico']=='OUT') | (df_ref['Tipo de Servico']=='IN')].reset_index(drop=True)
+        
+        df_ref_trf_group = df_ref_trf.groupby(['Veículo', 'Guia', 'Motorista']).agg({'Valor': 'count', 'Tipo de Servico': transformar_lista})
+        
+        df_ref_trf_group = df_ref_trf_group[(df_ref_trf_group['Valor']==2) & 
+                                            (df_ref_trf_group['Tipo de Servico'].apply(lambda x: all(item in x for item in ['IN', 'OUT'])))].reset_index(drop=True)
+        
+        if len(df_ref_trf_group)>0:
+        
+            out_in = int(df_ref_trf_group['Valor'].sum()/2)
+        
+            df_pag_motoristas.at[index, 'Qtd. Serviços'] -= out_in
+        
+            value = df_pag_motoristas.at[index, 'Qtd. Serviços']
+        
+        # Se fez mais de um serviço no dia
+        
+        if value > 1:
+            
+            lista_tipo_do_servico = df_ref['Tipo de Servico'].unique().tolist()
+
+            lista_servico = df_ref[df_ref['Tipo de Servico']=='TOUR']['Servico'].unique().tolist()
+            
+            # Verifica se no dia em questão tem algum serviço do tipo TOUR
+            
+            if not 'TOUR' in lista_tipo_do_servico:
+                
+                df_pag_motoristas.at[index, 'Apenas TRF/APOIO/ENTARDECER'] = 'x'
+
+            elif (len(lista_servico)==1 and lista_servico[0]=='ENTARDECER NA PRAIA DO JACARÉ ') or \
+                (len(lista_servico)==1 and lista_servico[0]=='ALUGUEL DENTRO DE JPA') or \
+                    (len(lista_servico)==2 and 'ALUGUEL DENTRO DE JPA' in lista_servico and 
+                        'ENTARDECER NA PRAIA DO JACARÉ ' in lista_servico):
+                
+                df_pag_motoristas.at[index, 'Apenas TRF/APOIO/ENTARDECER'] = 'x'    
+            
+        lista_regioes = []
+            
+        # Verifica se teve serviço intermunicipal ou interestadual
+        
+        for index_2, value_2 in df_ref['Região'].items():
+            
+            if value_2 != 'JOÃO PESSOA':
+                
+                lista_regioes.append(value_2)
+                
+        if len(lista_regioes)>0:
+            
+            df_pag_motoristas.at[index, 'Interestadual/Intermunicipal'] = 'x' 
+
+    return df_pag_motoristas
+
+def identificar_passeios_sem_apoio(df_pag_motoristas):
+
+    for index, value in df_pag_motoristas['Qtd. Serviços'].items():
+
+        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
+        
+        motorista = df_pag_motoristas.at[index, 'Motorista']
+        
+        df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
+
+        for index_2, value_2 in df_ref['Servico'].items():
+
+            if value_2 in st.session_state.df_passeios_sem_apoio['Servico'].unique().tolist():
+
+                df_pag_motoristas.at[index, 'Passeios sem Apoio'] = 'x' 
+
+    return df_pag_motoristas
+
+def identificar_acrescimo_50(df_pag_motoristas):
+
+    df_pag_motoristas['Acréscimo 50%'] = ''
+    df_pag_motoristas['Valor 50%'] = 0
+
+    # Função auxiliar para verificar e aplicar a lógica
+    def verificar_acrescimo(row):
+        apr_time = row['Data | Horario Apresentacao']
+        voo_time = row['Data | Horario Voo']
+
+        # Verifica se os valores não são nulos
+        if pd.notna(apr_time) and pd.notna(voo_time):
+            apr_time_date = apr_time.date()
+            apr_time_time = apr_time.time()
+            voo_time_date = voo_time.date()
+            voo_time_time = voo_time.time()
+
+            # Verifica as condições
+            if (time(4) < apr_time_time <= time(18)) and (
+                (voo_time_date == apr_time_date + timedelta(days=1)) or voo_time_time >= time(23, 59)
+            ):
+                row['Acréscimo 50%'] = 'x'
+        return row
+
+    # Aplica a função auxiliar a cada linha do DataFrame
+    df_pag_motoristas = df_pag_motoristas.apply(verificar_acrescimo, axis=1)
+
+    return df_pag_motoristas
+
+def precificar_acrescimo_50(df_pag_motoristas, df_pag_concat):
+
+    for index, value in df_pag_motoristas['Acréscimo 50%'].items():
+        
+        if value == 'x':
+            
+            data_escala = df_pag_motoristas.at[index, 'Data da Escala']
+        
+            motorista = df_pag_motoristas.at[index, 'Motorista']
+            
+            df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
+            
+            df_pag_motoristas.at[index, 'Valor 50%'] = df_ref['Valor'].iloc[-1] * 0.5
+
+    return df_pag_motoristas
+
+def definir_nomes_servicos_veiculos_por_dia(df_pag_motoristas, df_pag_concat):
+
+    df_pag_motoristas['Serviços / Veículos'] = ''
+
+    for index, value in df_pag_motoristas['Motorista'].items():
+        
+        str_servicos = ''
+        
+        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
+        
+        df_ref = df_pag_concat[(df_pag_concat['Motorista']==value) & (df_pag_concat['Data da Escala']==data_escala)].reset_index(drop=True)
+        
+        for index_2, value_2 in df_ref['Servico'].items():
+            
+            if str_servicos == '':
+                
+                str_servicos = f"Serviço: {value_2} | Veículo: {df_ref.at[index_2, 'Veículo']}"
+                
+            else:
+            
+                str_servicos = f"{str_servicos}<br><br>Serviço: {value_2} | Veículo: {df_ref.at[index_2, 'Veículo']}"
+                
+        df_pag_motoristas.at[index, 'Serviços / Veículos'] = str_servicos
+
+    return df_pag_motoristas
 
 def criar_colunas_escala_veiculo_mot_guia(df_apoios):
 
@@ -343,44 +491,6 @@ def criar_df_apoios():
 
     return df_pag_apoios, lista_veiculos_sem_diaria
 
-def inserir_mapa_sheets(df_pag_final):
-
-    # GCP projeto onde está a chave credencial
-    project_id = "grupoluck"
-
-    # ID da chave credencial do google.
-    secret_id = "cred-luck-aracaju"
-
-    # Cria o cliente.
-    secret_client = secretmanager.SecretManagerServiceClient()
-
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-
-    secret_payload = response.payload.data.decode("UTF-8")
-
-    credentials_info = json.loads(secret_payload)
-
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-
-    # Use the credentials to authorize the gspread client
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
-    client = gspread.authorize(credentials)
-
-    spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
-    
-    sheet = spreadsheet.worksheet('BD - Mapa de Pagamento - Motoristas')
-
-    sheet.batch_clear(["2:100000"])
-
-    df_pag_final = df_pag_final.fillna("").astype(str)
-
-    data_to_insert = df_pag_final.values.tolist()
-
-    sheet.update("A2", data_to_insert)
-    
-    st.success('Informações de Pagamentos inseridas na planilha!')
-
 def definir_html(df_ref):
 
     html=df_ref.to_html(index=False, escape=False)
@@ -423,41 +533,16 @@ def criar_output_html(nome_html, html, guia, soma_servicos):
 
         file.write(f'<br><br><p style="font-size:40px;">O valor total dos serviços é {soma_servicos}</p>')
 
-def puxar_dados_phoenix():
-
-    st.session_state.df_escalas = gerar_df_phoenix('vw_payment_guide')
-
-    st.session_state.df_escalas = st.session_state.df_escalas[(st.session_state.df_escalas['Status do Servico']!='CANCELADO') & 
-                                                              (~pd.isna(st.session_state.df_escalas['Escala']))].reset_index(drop=True)
-
-    st.session_state.df_escalas['Data | Horario Apresentacao'] = pd.to_datetime(st.session_state.df_escalas['Data | Horario Apresentacao'], errors='coerce')
-
-    st.session_state.df_escalas.loc[(st.session_state.df_escalas['Modo']=='PRIVATIVO POR VEICULO') | 
-                                    (st.session_state.df_escalas['Modo']=='PRIVATIVO POR PESSOA'), 'Modo'] = 'PRIVATIVO'
-    
-    st.session_state.df_escalas['Guia'] = st.session_state.df_escalas['Guia'].fillna('')
-
 def puxar_aba_simples(id_gsheet, nome_aba, nome_df):
 
-    # GCP projeto onde está a chave credencial
     project_id = "grupoluck"
-
-    # ID da chave credencial do google.
     secret_id = "cred-luck-aracaju"
-
-    # Cria o cliente.
     secret_client = secretmanager.SecretManagerServiceClient()
-
     secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
     response = secret_client.access_secret_version(request={"name": secret_name})
-
     secret_payload = response.payload.data.decode("UTF-8")
-
     credentials_info = json.loads(secret_payload)
-
     scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-
-    # Use the credentials to authorize the gspread client
     credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
     client = gspread.authorize(credentials)
 
@@ -481,25 +566,14 @@ def verificar_guia_sem_telefone(id_gsheet, guia, lista_guias_com_telefone):
 
         st.dataframe(df_itens_faltantes, hide_index=True)
 
-        # GCP projeto onde está a chave credencial
         project_id = "grupoluck"
-    
-        # ID da chave credencial do google.
         secret_id = "cred-luck-aracaju"
-    
-        # Cria o cliente.
         secret_client = secretmanager.SecretManagerServiceClient()
-    
         secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
         response = secret_client.access_secret_version(request={"name": secret_name})
-    
         secret_payload = response.payload.data.decode("UTF-8")
-    
         credentials_info = json.loads(secret_payload)
-    
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    
-        # Use the credentials to authorize the gspread client
         credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
         client = gspread.authorize(credentials)
         
@@ -524,21 +598,9 @@ def verificar_guia_sem_telefone(id_gsheet, guia, lista_guias_com_telefone):
 
     return telefone_guia
 
-def verificar_apoios_duplicados(df_apoio_filtrado):
-    
-    df_apoios_duplicados = df_apoio_filtrado[df_apoio_filtrado['Apoio'].str.contains(r' \| ', regex=True)]
-
-    df_apoios_duplicados['data_escala'] = pd.to_datetime(df_apoios_duplicados['Data da Escala']).dt.strftime('%d/%m/%Y') + ' | ' + df_apoios_duplicados['Escala']
-
-    if len(df_apoios_duplicados['data_escala'].unique().tolist())>0:
-
-        nomes_data_escalas = ', '.join(df_apoios_duplicados['data_escala'].unique().tolist())
-
-        st.error(f'As escalas {nomes_data_escalas} possuem escala auxiliar duplicada')
-
-        st.stop()
-        
 st.set_page_config(layout='wide')
+
+st.session_state.id_gsheet = '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E'
 
 # Puxando dados do Phoenix da 'vw_payment_guide'
 
@@ -570,11 +632,11 @@ with row1[0]:
 
     gerar_mapa = container_datas.button('Gerar Mapa')
 
+# Atualizar Dados Phoenix
+
 with row1[1]:
 
     row_1_1 = st.columns(3)
-
-    # Botão 'Atualizar Dados Phoenix'
 
     with row_1_1[0]:
 
@@ -592,231 +654,96 @@ st.divider()
 
 if data_final and data_inicial and gerar_mapa:
 
-    puxar_veiculo_categoria()
+    # Puxando infos das planilhas
 
-    puxar_regiao()
+    # with st.spinner('Puxando valores de diárias por veículo, ajudas de custo, passeios sem apoio'):
+
+    #     puxar_infos_gdrive(st.session_state.id_gsheet, 'df_veiculo_categoria', 'BD - Veiculo Categoria', 'df_regiao', 'BD - Passeios | Interestaduais', 'df_passeios_sem_apoio', 
+    #                        'BD - Passeios sem Apoio')
+
+    # Criando apoios e pegando lista de veículos no apoio que não tem valor de diária cadastrada
     
     df_pag_apoios, lista_veiculos_sem_diaria = criar_df_apoios()
 
-    df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & 
-                                            (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
-                                            (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
+    # Selecionando apenas os motoristas autônomos e período solicitados
+
+    df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
+                                              (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
+    
+    # Verificando se todos os serviços estão com região cadastrada pra poder gerar as ajudas de custo
     
     verificar_servicos_regiao(df_filtrado, st.session_state.df_regiao)
 
-    mask = df_filtrado['Tipo de Servico'].isin(['TOUR', 'TRANSFER'])
+    # Preenchendo Data Voo e Horario Voo com a data e horário de apresentação
 
-    df_filtrado.loc[mask, 'Data Voo'] = df_filtrado.loc[mask, 'Data | Horario Apresentacao'].dt.date
+    df_filtrado = preencher_data_hora_voo_tt(df_filtrado)
 
-    df_filtrado.loc[mask, 'Horario Voo'] = df_filtrado.loc[mask, 'Data | Horario Apresentacao'].dt.time
-
-    df_filtrado = df_filtrado.rename(columns={'Veiculo': 'Veículo'})
+    # Adicionando valor de diária por veículo
 
     df_filtrado = pd.merge(df_filtrado, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
 
-    lista_veiculos_sem_diaria.extend(df_filtrado[pd.isna(df_filtrado['Valor'])]['Veículo'].unique().tolist())
+    # Verificando se tem veículo sem diária cadastrada
 
-    if len(lista_veiculos_sem_diaria)>0:
+    verificar_veiculos_sem_diaria(lista_veiculos_sem_diaria, df_filtrado)
 
-        nome_veiculos_sem_diaria = ', '.join(lista_veiculos_sem_diaria)
+    # Verificando se existem reservas sem voo
 
-        st.error(f'Os veículos {nome_veiculos_sem_diaria} não tem valor de diária cadastrada. Cadastre e tente novamente, por favor')
+    verificar_reservas_sem_voo(df_filtrado)
 
-        st.stop()
+    # Diminuindo 1 dia da data da escala, quando os voos são na madrugada
 
-    df_filtrado['Horario Voo'] = pd.to_datetime(df_filtrado['Horario Voo'], format='%H:%M:%S').dt.time
+    df_filtrado = ajustar_data_escala_voos_madrugada(df_filtrado)
 
-    if len(df_filtrado[df_filtrado['Data Voo']==''])>0:
+    # Agrupando escalas
 
-        lista_reservas = ', '.join(df_filtrado[df_filtrado['Data Voo']=='']['Reserva'].unique().tolist())
+    df_pag_geral = agrupar_escalas(df_filtrado)
 
-        df_filtrado.loc[df_filtrado['Data Voo']=='', 'Data Voo'] = df_filtrado['Data | Horario Apresentacao'].dt.date
+    # Ajustar data de passeios que terminam na madrugada
 
-        df_filtrado.loc[pd.isna(df_filtrado['Horario Voo']), 'Horario Voo'] = df_filtrado['Data | Horario Apresentacao'].dt.time
+    df_pag_geral = ajustar_data_tt_madrugada(df_pag_geral)
 
-        st.error(f'As reservas {lista_reservas} estão sem voo no IN ou OUT. O robô vai gerar os pagamentos, criando um horário fictício para o voo')
-
-    df_filtrado['Data | Horario Voo'] = pd.to_datetime(df_filtrado['Data Voo'].astype(str) + ' ' + df_filtrado['Horario Voo'].astype(str))
-
-    for index in range(len(df_filtrado)):
-
-        tipo_de_servico = df_filtrado.at[index, 'Tipo de Servico']
-
-        if tipo_de_servico!='TOUR' and tipo_de_servico!='TRANSFER':
-
-            hora_voo = df_filtrado.at[index, 'Horario Voo']
-
-            hora_apresentacao = df_filtrado.at[index, 'Data | Horario Apresentacao'].time()
-
-            if (hora_voo >= pd.to_datetime('00:00:00').time() and hora_voo <= pd.to_datetime('07:00:00').time()) or \
-                (hora_apresentacao >= pd.to_datetime('00:00:00').time() and hora_apresentacao <= pd.to_datetime('04:00:00').time()):
-
-                df_filtrado.at[index, 'Data da Escala']-=pd.Timedelta(days=1)
-
-    df_pag_geral = df_filtrado.groupby(['Escala', 'Data da Escala', 'Modo', 'Tipo de Servico', 'Servico', 'Veículo', 'Motorista'])\
-        .agg({'Data | Horario Voo': 'max', 'Data | Horario Apresentacao': 'max', 'Valor': 'max', 'Guia': 'first'}).reset_index()
-    
-    df_pag_geral = df_pag_geral.sort_values(by = ['Data da Escala', 'Data | Horario Apresentacao']).reset_index(drop=True)
-
-    df_pag_geral = df_pag_geral.apply(ajustar_data_horario, axis=1)
+    # Inserindo região
 
     df_pag_geral = pd.merge(df_pag_geral, st.session_state.df_regiao, on = 'Servico', how = 'left')
 
+    # Juntando os apoios
+
     df_pag_concat = pd.concat([df_pag_geral, df_pag_apoios], ignore_index=True)
 
-    df_pag_motoristas = df_pag_concat.groupby(['Data da Escala', 'Motorista']).agg({'Valor': 'max', 'Data | Horario Voo': 'max', 
-                                                                                    'Data | Horario Apresentacao': 'min', 'Modo': 'count'}).reset_index()
+    # Verificando se fez apenas TRF/APOIO/ENTARDECER e se teve serviço Interestadual/Intermunicipal
+
+    df_pag_motoristas = verificar_trf_apoio_ent_interestadual(df_pag_concat)
+
+    # Identificando passeios sem ponto de apoio
+
+    df_pag_motoristas = identificar_passeios_sem_apoio(df_pag_motoristas)
+
+    # Identificando Acréscimo 50%
+
+    df_pag_motoristas = identificar_acrescimo_50(df_pag_motoristas)
+
+    # Precificando o acréscimo da diária de 50%
+
+    df_pag_motoristas = precificar_acrescimo_50(df_pag_motoristas, df_pag_concat)
+
+    # Precificando ajudas de custo
+
+    df_pag_motoristas['Ajuda de Custo'] = df_pag_motoristas.apply(lambda row: 25 if row['Interestadual/Intermunicipal']=='x' else 
+                                                                  15 if row['Apenas TRF/APOIO/ENTARDECER']=='x' or row['Passeios sem Apoio']=='x' else 0, axis=1)
     
-    df_pag_motoristas = df_pag_motoristas.rename(columns = {'Modo': 'Qtd. Serviços'})
+    # Ajustando nomes de serviços e veículos utilizados por dia
 
-    df_pag_motoristas['Apenas TRF/APOIO/ENTARDECER'] = ''
-    df_pag_motoristas['Interestadual/Intermunicipal'] = ''
-    df_pag_motoristas['Passeios sem Apoio'] = ''
+    df_pag_motoristas = definir_nomes_servicos_veiculos_por_dia(df_pag_motoristas, df_pag_concat)
 
-    for index, value in df_pag_motoristas['Qtd. Serviços'].items():
-
-        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
-        
-        motorista = df_pag_motoristas.at[index, 'Motorista']
-        
-        df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
-        
-        # Deduzindo da Qtd Serviços as junções de OUT e IN, ou seja, contabilizando cada junção como apenas 1 serviço
-        
-        df_ref_trf = df_ref[(df_ref['Tipo de Servico']=='OUT') | (df_ref['Tipo de Servico']=='IN')].reset_index(drop=True)
-        
-        def funcao(x):
-            return list(x)
-        
-        df_ref_trf_group = df_ref_trf.groupby(['Veículo', 'Guia', 'Motorista']).agg({'Valor': 'count', 'Tipo de Servico': funcao})
-        
-        df_ref_trf_group = df_ref_trf_group[(df_ref_trf_group['Valor']==2) & 
-                                            (df_ref_trf_group['Tipo de Servico'].apply(lambda x: all(item in x for item in ['IN', 'OUT'])))].reset_index(drop=True)
-        
-        if len(df_ref_trf_group)>0:
-        
-            out_in = int(df_ref_trf_group['Valor'].sum()/2)
-        
-            df_pag_motoristas.at[index, 'Qtd. Serviços'] -= out_in
-        
-            value = df_pag_motoristas.at[index, 'Qtd. Serviços']
-        
-        # Se fez mais de um serviço no dia
-        
-        if value > 1:
-            
-            lista_tipo_do_servico = df_ref['Tipo de Servico'].unique().tolist()
-
-            lista_servico = df_ref[df_ref['Tipo de Servico']=='TOUR']['Servico'].unique().tolist()
-            
-            # Verifica se no dia em questão tem algum serviço do tipo TOUR
-            
-            if not 'TOUR' in lista_tipo_do_servico:
-                
-                df_pag_motoristas.at[index, 'Apenas TRF/APOIO/ENTARDECER'] = 'x'
-
-            elif (len(lista_servico)==1 and lista_servico[0]=='ENTARDECER NA PRAIA DO JACARÉ ') or \
-                (len(lista_servico)==1 and lista_servico[0]=='ALUGUEL DENTRO DE JPA') or \
-                    (len(lista_servico)==2 and 'ALUGUEL DENTRO DE JPA' in lista_servico and 
-                        'ENTARDECER NA PRAIA DO JACARÉ ' in lista_servico):
-                
-                df_pag_motoristas.at[index, 'Apenas TRF/APOIO/ENTARDECER'] = 'x'
-                
-            
-        lista_regioes = []
-            
-        # Verifica se teve serviço intermunicipal ou interestadual
-        
-        for index_2, value_2 in df_ref['Região'].items():
-            
-            if value_2 != 'JOÃO PESSOA':
-                
-                lista_regioes.append(value_2)
-                
-        if len(lista_regioes)>0:
-            
-            df_pag_motoristas.at[index, 'Interestadual/Intermunicipal'] = 'x' 
-
-
-    puxar_passeios_sem_apoio()
-
-    for index, value in df_pag_motoristas['Qtd. Serviços'].items():
-
-        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
-        
-        motorista = df_pag_motoristas.at[index, 'Motorista']
-        
-        df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
-
-        for index_2, value_2 in df_ref['Servico'].items():
-
-            if value_2 in st.session_state.df_passeios_sem_apoio['Servico'].unique().tolist():
-
-                df_pag_motoristas.at[index, 'Passeios sem Apoio'] = 'x' 
-
-
-    df_pag_motoristas['Acréscimo 50%'] = ''
-
-    df_pag_motoristas = df_pag_motoristas.apply(verificar_acrescimo, axis=1)
-
-    df_pag_motoristas['Valor 50%'] = 0
-
-    for index, value in df_pag_motoristas['Acréscimo 50%'].items():
-        
-        if value == 'x':
-            
-            data_escala = df_pag_motoristas.at[index, 'Data da Escala']
-        
-            motorista = df_pag_motoristas.at[index, 'Motorista']
-            
-            df_ref = df_pag_concat[(df_pag_concat['Data da Escala']==data_escala) & (df_pag_concat['Motorista']==motorista)].reset_index(drop=True)
-            
-            df_pag_motoristas.at[index, 'Valor 50%'] = df_ref['Valor'].iloc[-1] * 0.5
-
-    df_pag_motoristas['Ajuda de Custo'] = 0
-
-    for index in range(len(df_pag_motoristas)):
-        
-        apenas_trf_apoio = df_pag_motoristas.at[index, 'Apenas TRF/APOIO/ENTARDECER']
-        
-        inter = df_pag_motoristas.at[index, 'Interestadual/Intermunicipal']
-
-        passeios_sem_apoio = df_pag_motoristas.at[index, 'Passeios sem Apoio']
-        
-        if inter == 'x':
-            
-            df_pag_motoristas.at[index, 'Ajuda de Custo'] = 25
-            
-        elif apenas_trf_apoio == 'x' or passeios_sem_apoio == 'x':
-            
-            df_pag_motoristas.at[index, 'Ajuda de Custo'] = 15
-
-    df_pag_motoristas['Serviços / Veículos'] = ''
-
-    for index, value in df_pag_motoristas['Motorista'].items():
-        
-        str_servicos = ''
-        
-        data_escala = df_pag_motoristas.at[index, 'Data da Escala']
-        
-        df_ref = df_pag_concat[(df_pag_concat['Motorista']==value) & (df_pag_concat['Data da Escala']==data_escala)].reset_index(drop=True)
-        
-        for index_2, value_2 in df_ref['Servico'].items():
-            
-            if str_servicos == '':
-                
-                str_servicos = f"Serviço: {value_2} | Veículo: {df_ref.at[index_2, 'Veículo']}"
-                
-            else:
-            
-                str_servicos = f"{str_servicos}<br><br>Serviço: {value_2} | Veículo: {df_ref.at[index_2, 'Veículo']}"
-                
-        df_pag_motoristas.at[index, 'Serviços / Veículos'] = str_servicos
+    # Forçando ajuda de custo de 2 reais p/ ALUGUEL FORA DE JPA
 
     df_pag_motoristas.loc[df_pag_motoristas['Serviços / Veículos'].str.contains('ALUGUEL FORA DE JPA', na=False), 'Ajuda de Custo'] = 25
 
+    # Calculando Valor Total da diária
+
     df_pag_motoristas['Valor Total'] = df_pag_motoristas['Valor'] + df_pag_motoristas['Valor 50%'] + df_pag_motoristas['Ajuda de Custo']
 
+    # Renomeando colunas e ajustando estética
 
     df_pag_motoristas = df_pag_motoristas.rename(columns = {'Data | Horario Voo': 'Data/Horário de Término', 
                                                             'Data | Horario Apresentacao': 'Data/Horário de Início', 'Valor': 'Valor Diária'})
@@ -826,8 +753,6 @@ if data_final and data_inicial and gerar_mapa:
                                             'Valor Total']]
     
     st.session_state.df_pag_motoristas = df_pag_motoristas
-
-    inserir_mapa_sheets(df_pag_motoristas)
 
 if 'df_pag_motoristas' in st.session_state:
 
