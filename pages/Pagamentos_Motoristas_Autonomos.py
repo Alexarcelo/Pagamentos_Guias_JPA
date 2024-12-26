@@ -656,103 +656,105 @@ if data_final and data_inicial and gerar_mapa:
 
     # Puxando infos das planilhas
 
-    with st.spinner('Puxando valores de diárias por veículo, ajudas de custo, passeios sem apoio'):
+    with st.spinner('Puxando valores de diárias por veículo, ajudas de custo, passeios sem apoio...'):
 
         puxar_infos_gdrive(st.session_state.id_gsheet, 'df_veiculo_categoria', 'BD - Veiculo Categoria', 'df_regiao', 'BD - Passeios | Interestaduais', 'df_passeios_sem_apoio', 
                            'BD - Passeios sem Apoio')
 
-    # Criando apoios e pegando lista de veículos no apoio que não tem valor de diária cadastrada
+    with st.spinner('Gerando mapas de pagamento...'):
+
+        # Criando apoios e pegando lista de veículos no apoio que não tem valor de diária cadastrada
+        
+        df_pag_apoios, lista_veiculos_sem_diaria = criar_df_apoios()
     
-    df_pag_apoios, lista_veiculos_sem_diaria = criar_df_apoios()
-
-    # Selecionando apenas os motoristas autônomos e período solicitados
-
-    df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
-                                              (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
+        # Selecionando apenas os motoristas autônomos e período solicitados
     
-    # Verificando se todos os serviços estão com região cadastrada pra poder gerar as ajudas de custo
+        df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
+                                                  (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
+        
+        # Verificando se todos os serviços estão com região cadastrada pra poder gerar as ajudas de custo
+        
+        verificar_servicos_regiao(df_filtrado, st.session_state.df_regiao)
     
-    verificar_servicos_regiao(df_filtrado, st.session_state.df_regiao)
-
-    # Preenchendo Data Voo e Horario Voo com a data e horário de apresentação
-
-    df_filtrado = preencher_data_hora_voo_tt(df_filtrado)
-
-    # Adicionando valor de diária por veículo
-
-    df_filtrado = pd.merge(df_filtrado, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
-
-    # Verificando se tem veículo sem diária cadastrada
-
-    verificar_veiculos_sem_diaria(lista_veiculos_sem_diaria, df_filtrado)
-
-    # Verificando se existem reservas sem voo
-
-    verificar_reservas_sem_voo(df_filtrado)
-
-    # Diminuindo 1 dia da data da escala, quando os voos são na madrugada
-
-    df_filtrado = ajustar_data_escala_voos_madrugada(df_filtrado)
-
-    # Agrupando escalas
-
-    df_pag_geral = agrupar_escalas(df_filtrado)
-
-    # Ajustar data de passeios que terminam na madrugada
-
-    df_pag_geral = ajustar_data_tt_madrugada(df_pag_geral)
-
-    # Inserindo região
-
-    df_pag_geral = pd.merge(df_pag_geral, st.session_state.df_regiao, on = 'Servico', how = 'left')
-
-    # Juntando os apoios
-
-    df_pag_concat = pd.concat([df_pag_geral, df_pag_apoios], ignore_index=True)
-
-    # Verificando se fez apenas TRF/APOIO/ENTARDECER e se teve serviço Interestadual/Intermunicipal
-
-    df_pag_motoristas = verificar_trf_apoio_ent_interestadual(df_pag_concat)
-
-    # Identificando passeios sem ponto de apoio
-
-    df_pag_motoristas = identificar_passeios_sem_apoio(df_pag_motoristas)
-
-    # Identificando Acréscimo 50%
-
-    df_pag_motoristas = identificar_acrescimo_50(df_pag_motoristas)
-
-    # Precificando o acréscimo da diária de 50%
-
-    df_pag_motoristas = precificar_acrescimo_50(df_pag_motoristas, df_pag_concat)
-
-    # Precificando ajudas de custo
-
-    df_pag_motoristas['Ajuda de Custo'] = df_pag_motoristas.apply(lambda row: 25 if row['Interestadual/Intermunicipal']=='x' else 
-                                                                  15 if row['Apenas TRF/APOIO/ENTARDECER']=='x' or row['Passeios sem Apoio']=='x' else 0, axis=1)
+        # Preenchendo Data Voo e Horario Voo com a data e horário de apresentação
     
-    # Ajustando nomes de serviços e veículos utilizados por dia
-
-    df_pag_motoristas = definir_nomes_servicos_veiculos_por_dia(df_pag_motoristas, df_pag_concat)
-
-    # Forçando ajuda de custo de 2 reais p/ ALUGUEL FORA DE JPA
-
-    df_pag_motoristas.loc[df_pag_motoristas['Serviços / Veículos'].str.contains('ALUGUEL FORA DE JPA', na=False), 'Ajuda de Custo'] = 25
-
-    # Calculando Valor Total da diária
-
-    df_pag_motoristas['Valor Total'] = df_pag_motoristas['Valor'] + df_pag_motoristas['Valor 50%'] + df_pag_motoristas['Ajuda de Custo']
-
-    # Renomeando colunas e ajustando estética
-
-    df_pag_motoristas = df_pag_motoristas.rename(columns = {'Data | Horario Voo': 'Data/Horário de Término', 
-                                                            'Data | Horario Apresentacao': 'Data/Horário de Início', 'Valor': 'Valor Diária'})
-
-    df_pag_motoristas = df_pag_motoristas[['Data da Escala', 'Motorista', 'Data/Horário de Início', 'Data/Horário de Término', 
-                                            'Qtd. Serviços', 'Serviços / Veículos', 'Valor Diária', 'Valor 50%', 'Ajuda de Custo', 
-                                            'Valor Total']]
+        df_filtrado = preencher_data_hora_voo_tt(df_filtrado)
     
-    st.session_state.df_pag_motoristas = df_pag_motoristas
+        # Adicionando valor de diária por veículo
+    
+        df_filtrado = pd.merge(df_filtrado, st.session_state.df_veiculo_categoria, on='Veículo', how='left')
+    
+        # Verificando se tem veículo sem diária cadastrada
+    
+        verificar_veiculos_sem_diaria(lista_veiculos_sem_diaria, df_filtrado)
+    
+        # Verificando se existem reservas sem voo
+    
+        verificar_reservas_sem_voo(df_filtrado)
+    
+        # Diminuindo 1 dia da data da escala, quando os voos são na madrugada
+    
+        df_filtrado = ajustar_data_escala_voos_madrugada(df_filtrado)
+    
+        # Agrupando escalas
+    
+        df_pag_geral = agrupar_escalas(df_filtrado)
+    
+        # Ajustar data de passeios que terminam na madrugada
+    
+        df_pag_geral = ajustar_data_tt_madrugada(df_pag_geral)
+    
+        # Inserindo região
+    
+        df_pag_geral = pd.merge(df_pag_geral, st.session_state.df_regiao, on = 'Servico', how = 'left')
+    
+        # Juntando os apoios
+    
+        df_pag_concat = pd.concat([df_pag_geral, df_pag_apoios], ignore_index=True)
+    
+        # Verificando se fez apenas TRF/APOIO/ENTARDECER e se teve serviço Interestadual/Intermunicipal
+    
+        df_pag_motoristas = verificar_trf_apoio_ent_interestadual(df_pag_concat)
+    
+        # Identificando passeios sem ponto de apoio
+    
+        df_pag_motoristas = identificar_passeios_sem_apoio(df_pag_motoristas)
+    
+        # Identificando Acréscimo 50%
+    
+        df_pag_motoristas = identificar_acrescimo_50(df_pag_motoristas)
+    
+        # Precificando o acréscimo da diária de 50%
+    
+        df_pag_motoristas = precificar_acrescimo_50(df_pag_motoristas, df_pag_concat)
+    
+        # Precificando ajudas de custo
+    
+        df_pag_motoristas['Ajuda de Custo'] = df_pag_motoristas.apply(lambda row: 25 if row['Interestadual/Intermunicipal']=='x' else 
+                                                                      15 if row['Apenas TRF/APOIO/ENTARDECER']=='x' or row['Passeios sem Apoio']=='x' else 0, axis=1)
+        
+        # Ajustando nomes de serviços e veículos utilizados por dia
+    
+        df_pag_motoristas = definir_nomes_servicos_veiculos_por_dia(df_pag_motoristas, df_pag_concat)
+    
+        # Forçando ajuda de custo de 2 reais p/ ALUGUEL FORA DE JPA
+    
+        df_pag_motoristas.loc[df_pag_motoristas['Serviços / Veículos'].str.contains('ALUGUEL FORA DE JPA', na=False), 'Ajuda de Custo'] = 25
+    
+        # Calculando Valor Total da diária
+    
+        df_pag_motoristas['Valor Total'] = df_pag_motoristas['Valor'] + df_pag_motoristas['Valor 50%'] + df_pag_motoristas['Ajuda de Custo']
+    
+        # Renomeando colunas e ajustando estética
+    
+        df_pag_motoristas = df_pag_motoristas.rename(columns = {'Data | Horario Voo': 'Data/Horário de Término', 
+                                                                'Data | Horario Apresentacao': 'Data/Horário de Início', 'Valor': 'Valor Diária'})
+    
+        df_pag_motoristas = df_pag_motoristas[['Data da Escala', 'Motorista', 'Data/Horário de Início', 'Data/Horário de Término', 
+                                                'Qtd. Serviços', 'Serviços / Veículos', 'Valor Diária', 'Valor 50%', 'Ajuda de Custo', 
+                                                'Valor Total']]
+        
+        st.session_state.df_pag_motoristas = df_pag_motoristas
 
 if 'df_pag_motoristas' in st.session_state:
 
