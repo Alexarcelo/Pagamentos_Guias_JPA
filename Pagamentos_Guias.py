@@ -770,8 +770,7 @@ if 'df_pag_final' in st.session_state:
 
     with row2[0]:
 
-        lista_guias = st.session_state.df_pag_final[~(st.session_state.df_pag_final['Guia'].isin(['SEM GUIA', 'NENHUM GUIA', ''])) & 
-                                                    (~st.session_state.df_pag_final['Guia'].str.contains('BUGUEIRO')) & (~st.session_state.df_pag_final['Guia'].str.contains('PDV')) & 
+        lista_guias = st.session_state.df_pag_final[~(st.session_state.df_pag_final['Guia'].isin(['SEM GUIA', 'NENHUM GUIA', ''])) & (~st.session_state.df_pag_final['Guia'].str.contains('PDV')) & 
                                                     (~st.session_state.df_pag_final['Guia'].str.contains('BASE AEROPORTO')) & 
                                                     (~st.session_state.df_pag_final['Guia'].str.contains('VENDAS ONLINE'))]['Guia'].dropna().unique().tolist()
 
