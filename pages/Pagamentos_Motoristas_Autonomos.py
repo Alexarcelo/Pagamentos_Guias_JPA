@@ -598,6 +598,24 @@ def verificar_guia_sem_telefone(id_gsheet, guia, lista_guias_com_telefone):
 
     return telefone_guia
 
+def criar_output_html_geral(nome_html):
+
+    with open(nome_html, "w", encoding="utf-8") as file:
+
+        pass
+
+def inserir_html(nome_html, html, guia, soma_servicos):
+
+    with open(nome_html, "a", encoding="utf-8") as file:
+
+        file.write('<div style="page-break-before: always;"></div>\n')
+
+        file.write(f'<p style="font-size:40px;">{guia}</p><br><br>')
+
+        file.write(html)
+
+        file.write(f'<br><br><p style="font-size:40px;">O valor total dos serviços é {soma_servicos}</p>')
+        
 st.set_page_config(layout='wide')
 
 st.session_state.id_gsheet = '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E'
@@ -893,6 +911,37 @@ if 'df_pag_motoristas' in st.session_state:
 
                     st.error(f"{response}")
 
+            else:
+
+                nome_html = f'Mapas Motoristas Geral.html'
+
+                criar_output_html_geral(nome_html)
+
+                for motorista_ref in lista_motoristas:
+
+                    df_pag_guia = st.session_state.df_pag_final[st.session_state.df_pag_final['Guia']==motorista_ref].sort_values(by=['Data da Escala']).reset_index(drop=True)
+
+                    soma_servicos = df_pag_guia['Valor Total'].sum()
+
+                    soma_servicos = format_currency(soma_servicos, 'BRL', locale='pt_BR')
+
+                    html = definir_html(df_pag_guia)
+
+                    inserir_html(nome_html, html, guia_ref, soma_servicos)
+
+                with open(nome_html, "r", encoding="utf-8") as file:
+
+                    html_content = file.read()
+
+                with row2_1[1]:
+
+                    st.download_button(
+                        label="Baixar Arquivo HTML - Geral",
+                        data=html_content,
+                        file_name=nome_html,
+                        mime="text/html"
+                    )
+                    
 if 'html_content' in st.session_state and motorista:
 
     with row2_1[2]:
