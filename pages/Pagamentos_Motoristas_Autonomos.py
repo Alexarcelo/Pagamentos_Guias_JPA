@@ -624,10 +624,15 @@ def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
         df_insercao[column] = df_insercao[column].astype(str)
 
-    nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
-    credentials = service_account.Credentials.from_service_account_info(nome_credencial)
-    scope = ['https://www.googleapis.com/auth/spreadsheets']
-    credentials = credentials.with_scopes(scope)
+    project_id = "grupoluck"
+    secret_id = "cred-luck-aracaju"
+    secret_client = secretmanager.SecretManagerServiceClient()
+    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+    response = secret_client.access_secret_version(request={"name": secret_name})
+    secret_payload = response.payload.data.decode("UTF-8")
+    credentials_info = json.loads(secret_payload)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
     client = gspread.authorize(credentials)
     
     spreadsheet = client.open_by_key(id_gsheet)
