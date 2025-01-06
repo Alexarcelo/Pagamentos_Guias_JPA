@@ -622,7 +622,9 @@ def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
     for column in df_insercao.columns:
 
-        df_insercao[column] = df_insercao[column].astype(str)
+        if not 'Valor' in column and not 'Ajuda' in column:
+
+            df_insercao[column] = df_insercao[column].astype(str)
 
     project_id = "grupoluck"
     secret_id = "cred-luck-aracaju"
