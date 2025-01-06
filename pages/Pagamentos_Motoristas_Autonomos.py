@@ -798,7 +798,7 @@ if data_final and data_inicial and gerar_mapa:
 
         # Preenchendo aba 'BD - Mapa de Pagamento - Motoristas' no Drive
 
-        with st.spinner('Inserindo mapas de pagamentos na planilha do Drive...):
+        with st.spinner('Inserindo mapas de pagamentos na planilha do Drive...'):
 
             inserir_df_gsheet(st.session_state.df_pag_motoristas, '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', 'BD - Mapa de Pagamento - Motoristas')
 
