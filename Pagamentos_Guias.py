@@ -10,6 +10,7 @@ import requests
 from google.cloud import secretmanager 
 import json
 from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
 
 def gerar_df_phoenix(vw_name):
     
@@ -211,13 +212,17 @@ def ajustar_pag_giuliano_junior_neto_tt(df):
     
     df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
-    mask_pag_neto_junior = (df['Guia'].isin(['JUNIOR BUGUEIRO - GUIA', 'NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
+    mask_pag_junior = (df['Guia'].isin(['JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
 
-    df.loc[mask_pag_neto_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
+    df.loc[mask_pag_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
 
     mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
 
     df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+
+    mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & (df['Est. Origem']!='BA´RA HOTEL') & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
+
+    df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [350, 0, 350]
     
     return df
 
@@ -307,25 +312,25 @@ def ajustar_pag_giuliano_junior_neto_in_out(df):
     
     df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
-    mask_pag_neto_junior = (df['Guia'].isin(['JUNIOR BUGUEIRO - GUIA', 'NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
+    mask_pag_junior = (df['Guia'].isin(['JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
 
-    df.loc[mask_pag_neto_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
+    df.loc[mask_pag_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
 
     mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
 
     df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
 
+    mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
+
+    df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [350, 0, 350]
+
     return df
 
 def ajustar_valor_transferistas(df_pag_guias_in_out_final, transferistas):
 
-    mask_transferistas = (df_pag_guias_in_out_final['Guia'].isin(transferistas)) & (df_pag_guias_in_out_final['Valor Total']<85) & (df_pag_guias_in_out_final['Valor Total']!=0)
+    mask_transferistas = (df_pag_guias_in_out_final['Guia'].isin(transferistas)) & (df_pag_guias_in_out_final['Valor']<85)
 
-    df_pag_guias_in_out_final.loc[mask_transferistas, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [85, 0, 85]
-
-    mask_transferistas_2 = (df_pag_guias_in_out_final['Guia'].isin(transferistas)) & (df_pag_guias_in_out_final['Valor Total']==0)
-
-    df_pag_guias_in_out_final.loc[mask_transferistas_2, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [85, 0, -85]
+    df_pag_guias_in_out_final.loc[mask_transferistas, ['Valor', 'Acréscimo Motoguia']] = [85, 0]
 
     return df_pag_guias_in_out_final
 
@@ -742,6 +747,10 @@ if data_final and data_inicial:
 
                 df_pag_guias_in_out = gerar_pag_motoguia(df_pag_guias_in_out)
 
+                # Ajustando valor mínimo de transferistas
+
+                df_pag_guias_in_out = ajustar_valor_transferistas(df_pag_guias_in_out, transferistas)
+
                 # Verificando junções de OUTs e INs
 
                 df_pag_guias_in_out_final = verificar_juncoes_in_out(df_pag_guias_in_out)
@@ -757,10 +766,6 @@ if data_final and data_inicial:
                 # Ajustando pagamentos de Giuliano, Junior e Neto
 
                 df_pag_guias_in_out_final = ajustar_pag_giuliano_junior_neto_in_out(df_pag_guias_in_out_final)
-
-                # Ajustando valor mínimo de transferistas
-
-                df_pag_guias_in_out_final = ajustar_valor_transferistas(df_pag_guias_in_out_final, transferistas)
 
                 # Ajustando colunas pra depois concatenar
 
