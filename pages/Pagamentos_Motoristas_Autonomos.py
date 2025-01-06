@@ -615,7 +615,29 @@ def inserir_html(nome_html, html, guia, soma_servicos):
         file.write(html)
 
         file.write(f'<br><br><p style="font-size:40px;">O valor total dos serviços é {soma_servicos}</p>')
-        
+
+def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
+
+    project_id = "grupoluck"
+    secret_id = "cred-luck-aracaju"
+    secret_client = secretmanager.SecretManagerServiceClient()
+    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+    response = secret_client.access_secret_version(request={"name": secret_name})
+    secret_payload = response.payload.data.decode("UTF-8")
+    credentials_info = json.loads(secret_payload)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    client = gspread.authorize(credentials)
+    
+    spreadsheet = client.open_by_key(id_gsheet)
+
+    sheet = spreadsheet.worksheet(nome_aba)
+
+    sheet.batch_clear(["A2:Z1000"])
+
+    data = df_itens_faltantes.values.tolist()
+    sheet.update('A2', data)
+
 st.set_page_config(layout='wide')
 
 st.session_state.id_gsheet = '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E'
@@ -774,6 +796,12 @@ if data_final and data_inicial and gerar_mapa:
         
         st.session_state.df_pag_motoristas = df_pag_motoristas
 
+        # Preenchendo aba 'BD - Mapa de Pagamento - Motoristas' no Drive
+
+        with st.spinner('Inserindo mapas de pagamentos na planilha do Drive...):
+
+            inserir_df_gsheet(st.session_state.df_pag_motoristas, '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', 'BD - Mapa de Pagamento - Motoristas')
+
 if 'df_pag_motoristas' in st.session_state:
 
     df_tabela_st = st.session_state.df_pag_motoristas.reset_index(drop=True)
@@ -919,7 +947,7 @@ if 'df_pag_motoristas' in st.session_state:
 
                 for motorista_ref in lista_motoristas:
 
-                    df_pag_guia = st.session_state.df_pag_final[st.session_state.df_pag_final['Guia']==motorista_ref].sort_values(by=['Data da Escala']).reset_index(drop=True)
+                    df_pag_guia = st.session_state.df_pag_motoristas[st.session_state.df_pag_motoristas['Motorista']==motorista_ref].sort_values(by=['Data da Escala']).reset_index(drop=True)
 
                     soma_servicos = df_pag_guia['Valor Total'].sum()
 
