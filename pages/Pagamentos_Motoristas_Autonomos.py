@@ -618,19 +618,16 @@ def inserir_html(nome_html, html, guia, soma_servicos):
 
 def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
-    for column in df_itens_faltantes.columns:
+    df_insercao = df_itens_faltantes.copy()
 
-        df_itens_faltantes[column] = df_itens_faltantes[column].astype(str)
+    for column in df_insercao.columns:
 
-    project_id = "grupoluck"
-    secret_id = "cred-luck-aracaju"
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-    secret_payload = response.payload.data.decode("UTF-8")
-    credentials_info = json.loads(secret_payload)
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+        df_insercao[column] = df_insercao[column].astype(str)
+
+    nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+    credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+    scope = ['https://www.googleapis.com/auth/spreadsheets']
+    credentials = credentials.with_scopes(scope)
     client = gspread.authorize(credentials)
     
     spreadsheet = client.open_by_key(id_gsheet)
@@ -639,7 +636,7 @@ def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
     sheet.batch_clear(["A2:Z1000"])
 
-    data = df_itens_faltantes.values.tolist()
+    data = df_insercao.values.tolist()
     sheet.update('A2', data)
 
 st.set_page_config(layout='wide')
