@@ -618,6 +618,10 @@ def inserir_html(nome_html, html, guia, soma_servicos):
 
 def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
+    for column in df_itens_faltantes.columns:
+
+        df_itens_faltantes[column] = df_itens_faltantes[column].astype(str)
+
     project_id = "grupoluck"
     secret_id = "cred-luck-aracaju"
     secret_client = secretmanager.SecretManagerServiceClient()
@@ -955,7 +959,7 @@ if 'df_pag_motoristas' in st.session_state:
 
                     html = definir_html(df_pag_guia)
 
-                    inserir_html(nome_html, html, guia_ref, soma_servicos)
+                    inserir_html(nome_html, html, motorista_ref, soma_servicos)
 
                 with open(nome_html, "r", encoding="utf-8") as file:
 
