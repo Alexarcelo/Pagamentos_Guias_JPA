@@ -805,7 +805,7 @@ if data_final and data_inicial and gerar_mapa:
         st.session_state.df_pag_motoristas = df_pag_motoristas
 
         st.session_state.df_pag_motoristas = st.session_state.df_pag_motoristas[(st.session_state.df_pag_motoristas['Data da Escala'] >= data_inicial) & 
-            (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
+            (st.session_state.df_pag_motoristas['Data da Escala'] <= data_final)].reset_index(drop=True)
 
         # Preenchendo aba 'BD - Mapa de Pagamento - Motoristas' no Drive
 
