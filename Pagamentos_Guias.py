@@ -211,13 +211,9 @@ def ajustar_pag_giuliano_junior_neto_tt(df):
     
     df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
-    mask_pag_junior = (df['Guia'].isin(['JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
+    mask_pag_junior_giuliano = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
 
-    df.loc[mask_pag_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
-
-    mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
-
-    df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+    df.loc[mask_pag_junior_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
 
     mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
 
@@ -311,13 +307,9 @@ def ajustar_pag_giuliano_junior_neto_in_out(df):
     
     df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
 
-    mask_pag_junior = (df['Guia'].isin(['JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<200) | (pd.isna(df['Valor Total'])))
+    mask_pag_junior_giuliano = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
 
-    df.loc[mask_pag_junior, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [200, 0, 200]
-
-    mask_pag_giuliano = (df['Guia'].isin(['GIULIANO - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
-
-    df.loc[mask_pag_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+    df.loc[mask_pag_junior_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
 
     mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
 
