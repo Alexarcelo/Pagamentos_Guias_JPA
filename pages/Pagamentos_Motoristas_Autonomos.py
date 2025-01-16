@@ -2,14 +2,14 @@ import streamlit as st
 import pandas as pd
 import mysql.connector
 import decimal
-import numpy as np
-from datetime import datetime, timedelta, time
+from datetime import timedelta, time
 from babel.numbers import format_currency
 import gspread 
 import requests
 from google.cloud import secretmanager 
 import json
 from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
 
 def gerar_df_phoenix(vw_name):
     # Parametros de Login AWS
@@ -115,7 +115,7 @@ def verificar_servicos_regiao(df_servicos, df_regiao):
         scopes = ["https://www.googleapis.com/auth/spreadsheets"]
         credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
         client = gspread.authorize(credentials)
-        
+
         spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
 
         sheet = spreadsheet.worksheet('BD - Passeios | Interestaduais')
@@ -229,7 +229,8 @@ def verificar_trf_apoio_ent_interestadual(df_pag_concat):
         
         df_ref_trf = df_ref[(df_ref['Tipo de Servico']=='OUT') | (df_ref['Tipo de Servico']=='IN')].reset_index(drop=True)
         
-        df_ref_trf_group = df_ref_trf.groupby(['Veículo', 'Guia', 'Motorista']).agg({'Valor': 'count', 'Tipo de Servico': transformar_lista})
+        df_ref_trf_group = df_ref_trf.groupby(['Veículo', 'Guia', 'Motorista'])\
+            .agg({'Valor': 'count', 'Tipo de Servico': transformar_lista, 'Data | Horario Voo': 'max', 'Data | Horario Apresentacao': 'min'})
         
         df_ref_trf_group = df_ref_trf_group[(df_ref_trf_group['Valor']==2) & 
                                             (df_ref_trf_group['Tipo de Servico'].apply(lambda x: all(item in x for item in ['IN', 'OUT'])))].reset_index(drop=True)
@@ -719,6 +720,11 @@ if data_final and data_inicial and gerar_mapa:
     
         df_filtrado = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
                                                   (st.session_state.df_escalas['Motorista'].str.contains('MOT AUT', na=False))].reset_index()
+        
+        # Ajustando Data | Horario Apresentacao de IN pra igualar ao do Voo
+        
+        df_filtrado['Data | Horario Apresentacao'] = df_filtrado.apply(lambda row: pd.to_datetime(str(row['Data da Escala']) + ' ' + str(row['Horario Voo'])) 
+                                                                if row['Tipo de Servico']=='IN' and not pd.isna(row['Horario Voo']) else row['Data | Horario Apresentacao'], axis=1)
         
         # Verificando se todos os serviços estão com região cadastrada pra poder gerar as ajudas de custo
         
