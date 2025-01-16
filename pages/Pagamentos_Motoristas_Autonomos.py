@@ -236,12 +236,18 @@ def verificar_trf_apoio_ent_interestadual(df_pag_concat):
                                             (df_ref_trf_group['Tipo de Servico'].apply(lambda x: all(item in x for item in ['IN', 'OUT'])))].reset_index(drop=True)
         
         if len(df_ref_trf_group)>0:
+
+            hora_inicio = df_ref_trf_group.at[0, 'Data | Horario Apresentacao']
+
+            hora_fim = df_ref_trf_group.at[0, 'Data | Horario Voo']
+
+            if hora_fim-hora_inicio<=timedelta(hours=10):
         
-            out_in = int(df_ref_trf_group['Valor'].sum()/2)
-        
-            df_pag_motoristas.at[index, 'Qtd. Serviços'] -= out_in
-        
-            value = df_pag_motoristas.at[index, 'Qtd. Serviços']
+                out_in = int(df_ref_trf_group['Valor'].sum()/2)
+            
+                df_pag_motoristas.at[index, 'Qtd. Serviços'] -= out_in
+            
+                value = df_pag_motoristas.at[index, 'Qtd. Serviços']
         
         # Se fez mais de um serviço no dia
         
