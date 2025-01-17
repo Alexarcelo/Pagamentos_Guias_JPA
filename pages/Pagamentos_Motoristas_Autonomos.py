@@ -56,15 +56,10 @@ def puxar_dados_phoenix():
 
 def puxar_infos_gdrive(id_gsheet, nome_df_1, aba_1, nome_df_2, aba_2, nome_df_3, aba_3):
 
-    project_id = "grupoluck"
-    secret_id = "cred-luck-aracaju"
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-    secret_payload = response.payload.data.decode("UTF-8")
-    credentials_info = json.loads(secret_payload)
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+    credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+    scope = ['https://www.googleapis.com/auth/spreadsheets']
+    credentials = credentials.with_scopes(scope)
     client = gspread.authorize(credentials)
 
     spreadsheet = client.open_by_key(id_gsheet)
@@ -105,15 +100,10 @@ def verificar_servicos_regiao(df_servicos, df_regiao):
 
         df_add_excel['1'] = ''
 
-        project_id = "grupoluck"
-        secret_id = "cred-luck-aracaju"
-        secret_client = secretmanager.SecretManagerServiceClient()
-        secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-        response = secret_client.access_secret_version(request={"name": secret_name})
-        secret_payload = response.payload.data.decode("UTF-8")
-        credentials_info = json.loads(secret_payload)
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+        nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+        credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+        scope = ['https://www.googleapis.com/auth/spreadsheets']
+        credentials = credentials.with_scopes(scope)
         client = gspread.authorize(credentials)
 
         spreadsheet = client.open_by_key('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E')
@@ -542,15 +532,10 @@ def criar_output_html(nome_html, html, guia, soma_servicos):
 
 def puxar_aba_simples(id_gsheet, nome_aba, nome_df):
 
-    project_id = "grupoluck"
-    secret_id = "cred-luck-aracaju"
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-    secret_payload = response.payload.data.decode("UTF-8")
-    credentials_info = json.loads(secret_payload)
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+    credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+    scope = ['https://www.googleapis.com/auth/spreadsheets']
+    credentials = credentials.with_scopes(scope)
     client = gspread.authorize(credentials)
 
     spreadsheet = client.open_by_key(id_gsheet)
@@ -573,15 +558,10 @@ def verificar_guia_sem_telefone(id_gsheet, guia, lista_guias_com_telefone):
 
         st.dataframe(df_itens_faltantes, hide_index=True)
 
-        project_id = "grupoluck"
-        secret_id = "cred-luck-aracaju"
-        secret_client = secretmanager.SecretManagerServiceClient()
-        secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-        response = secret_client.access_secret_version(request={"name": secret_name})
-        secret_payload = response.payload.data.decode("UTF-8")
-        credentials_info = json.loads(secret_payload)
-        scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-        credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+        nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+        credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+        scope = ['https://www.googleapis.com/auth/spreadsheets']
+        credentials = credentials.with_scopes(scope)
         client = gspread.authorize(credentials)
         
         spreadsheet = client.open_by_key(id_gsheet)
@@ -633,15 +613,10 @@ def inserir_df_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
             df_insercao[column] = df_insercao[column].astype(str)
 
-    project_id = "grupoluck"
-    secret_id = "cred-luck-aracaju"
-    secret_client = secretmanager.SecretManagerServiceClient()
-    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-    secret_payload = response.payload.data.decode("UTF-8")
-    credentials_info = json.loads(secret_payload)
-    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
+    credentials = service_account.Credentials.from_service_account_info(nome_credencial)
+    scope = ['https://www.googleapis.com/auth/spreadsheets']
+    credentials = credentials.with_scopes(scope)
     client = gspread.authorize(credentials)
     
     spreadsheet = client.open_by_key(id_gsheet)
