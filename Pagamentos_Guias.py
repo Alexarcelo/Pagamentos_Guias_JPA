@@ -583,7 +583,29 @@ def inserir_html(nome_html, html, guia, soma_servicos):
         file.write(html)
 
         file.write(f'<br><br><p style="font-size:40px;">O valor total dos serviços é {soma_servicos}</p>')
-        
+
+def inserir_dataframe_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
+
+    project_id = "grupoluck"
+    secret_id = "cred-luck-aracaju"
+    secret_client = secretmanager.SecretManagerServiceClient()
+    secret_name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+    response = secret_client.access_secret_version(request={"name": secret_name})
+    secret_payload = response.payload.data.decode("UTF-8")
+    credentials_info = json.loads(secret_payload)
+    scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+    credentials = Credentials.from_service_account_info(credentials_info, scopes=scopes)
+    client = gspread.authorize(credentials)
+    
+    spreadsheet = client.open_by_key(id_gsheet)
+
+    sheet = spreadsheet.worksheet(nome_aba)
+
+    sheet.batch_clear(["A2:Z100000"])
+
+    data = df_itens_faltantes.values.tolist()
+    sheet.update('A2', data)
+
 st.set_page_config(layout='wide')
 
 st.session_state.id_gsheet = '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E'
@@ -651,9 +673,11 @@ if data_final and data_inicial:
 
     if transferistas:
 
-        with row1[0]:
+        row1_2=container_datas.columns(2)
 
-            gerar_mapa = container_datas.button('Gerar Mapa de Pagamentos')
+        with row1_2[0]:
+
+            gerar_mapa = st.button('Gerar Mapa de Pagamentos')
 
         if gerar_mapa:
 
@@ -778,6 +802,29 @@ if data_final and data_inicial:
 
 if 'df_pag_final' in st.session_state:
 
+    with row1_2[1]:
+
+        salvar_mapa = st.button('Salvar Mapa de Pagamentos')
+
+    if salvar_mapa:
+
+        with st.spinner('Salvando mapa de pagamentos...'):
+
+            puxar_aba_simples(st.session_state.id_gsheet, 'Histórico de Pagamentos', 'df_historico_pagamentos')
+
+            st.session_state.df_historico_pagamentos['Data da Escala'] = pd.to_datetime(st.session_state.df_historico_pagamentos['Data da Escala']).dt.date
+
+            df_historico_fora_do_periodo = st.session_state.df_historico_pagamentos[~((st.session_state.df_historico_pagamentos['Data da Escala'] >= data_inicial) & 
+                                                                                    (st.session_state.df_historico_pagamentos['Data da Escala'] <= data_final))].reset_index(drop=True)
+            
+            df_insercao = pd.concat([df_historico_fora_do_periodo, st.session_state.df_pag_final], ignore_index=True)
+
+            df_insercao['Data da Escala'] = df_insercao['Data da Escala'].astype(str)
+
+            inserir_dataframe_gsheet(df_insercao, st.session_state.id_gsheet, 'Histórico de Pagamentos')
+
+if 'df_pag_final' in st.session_state:
+
     st.header('Gerar Mapas')
 
     row2 = st.columns(2)
@@ -855,7 +902,7 @@ if 'df_pag_final' in st.session_state:
 
             if enviar_informes:
 
-                puxar_aba_simples('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', 'Telefones Guias', 'df_telefones')
+                puxar_aba_simples(st.session_state.id_gsheet, 'Telefones Guias', 'df_telefones')
 
                 lista_htmls = []
 
@@ -863,7 +910,7 @@ if 'df_pag_final' in st.session_state:
 
                 for guia_ref in lista_guias:
 
-                    telefone_guia = verificar_guia_sem_telefone('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', guia_ref, st.session_state.df_telefones['Guias'].unique().tolist())
+                    telefone_guia = verificar_guia_sem_telefone(st.session_state.id_gsheet, guia_ref, st.session_state.df_telefones['Guias'].unique().tolist())
 
                     df_pag_guia = st.session_state.df_pag_final[st.session_state.df_pag_final['Guia']==guia_ref].sort_values(by=['Data da Escala', 'Veículo', 'Motorista']).reset_index(drop=True)
 
@@ -946,9 +993,9 @@ if 'html_content' in st.session_state and guia:
 
     if enviar_informes:
 
-        puxar_aba_simples('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', 'Telefones Guias', 'df_telefones')
+        puxar_aba_simples(st.session_state.id_gsheet, 'Telefones Guias', 'df_telefones')
 
-        telefone_guia = verificar_guia_sem_telefone('1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E', guia, st.session_state.df_telefones['Guias'].unique().tolist())
+        telefone_guia = verificar_guia_sem_telefone(st.session_state.id_gsheet, guia, st.session_state.df_telefones['Guias'].unique().tolist())
 
         webhook_thiago = "https://conexao.multiatend.com.br/webhook/pagamentoluckjoaopessoa"
         
