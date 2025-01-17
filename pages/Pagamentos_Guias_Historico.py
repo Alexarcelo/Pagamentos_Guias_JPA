@@ -284,7 +284,7 @@ if data_final and data_inicial:
 
             puxar_aba_simples(st.session_state.id_gsheet, 'Histórico de Pagamentos', 'df_historico_pagamentos')
 
-            st.session_state.df_historico_pagamentos['Data da Escala'] = pd.to_datetime(st.session_state.df_historico_pagamentos['Data da Escala']).dt.date
+            st.session_state.df_historico_pagamentos['Data da Escala'] = pd.to_datetime(st.session_state.df_historico_pagamentos['Data da Escala'], format='%d/%m/%Y').dt.date
 
             for coluna in ['Valor', 'Acréscimo Motoguia', 'Desconto por Junção', 'Valor Total']:
 
