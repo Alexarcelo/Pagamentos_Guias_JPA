@@ -231,7 +231,7 @@ def verificar_trf_apoio_ent_interestadual(df_pag_concat):
 
             hora_fim = df_ref_trf_group.at[0, 'Data | Horario Voo']
 
-            if hora_fim-hora_inicio<=timedelta(hours=4, minutes=15):
+            if hora_fim-hora_inicio<timedelta(hours=4, minutes=15):
         
                 out_in = int(df_ref_trf_group['Valor'].sum()/2)
             
