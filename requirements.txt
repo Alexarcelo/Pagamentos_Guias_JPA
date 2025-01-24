@@ -13,3 +13,4 @@ fastjsonschema==2.20.0
 jsonschema==4.22.0
 google-auth==2.34.0
 google-auth-oauthlib==1.2.0
+streamlit-aggrid==1.0.5
