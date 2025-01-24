@@ -600,11 +600,11 @@ if gerar_mapa:
 
     # Puxando tarifários e tratando colunas de números
 
-    # with st.spinner('Puxando tarifários...'):
+    with st.spinner('Puxando tarifários...'):
 
-    #     puxar_tarifario_fornecedores()
+        puxar_tarifario_fornecedores()
 
-    #     puxar_tarifario_bg_4x4()
+        puxar_tarifario_bg_4x4()
 
     # Filtrando período solicitado pelo usuário
 
