@@ -22,7 +22,12 @@ def gerar_df_phoenix(vw_name, base_luck):
     }
     conexao = mysql.connector.connect(**config)
     cursor = conexao.cursor()
-    request_name = f'SELECT * FROM {vw_name}'
+
+    if vw_name=='vw_sales':
+        request_name = f'SELECT `Cod_Reserva`, `Data Execucao`, `Nome_Servico`, `Valor_Servico`, `Desconto_Global` FROM {vw_name}'
+    else:
+        request_name = f'SELECT * FROM {vw_name}'
+        
     cursor.execute(request_name)
     resultado = cursor.fetchall()
     cabecalho = [desc[0] for desc in cursor.description]
@@ -472,9 +477,7 @@ def criar_output_html_email(nome_html, html, guia, soma_servicos):
 
 def inserir_valor_servico_desconto(df_escalas_group_bg_4x4):
 
-    df_sales_filtrado = st.session_state.df_sales[['Cod_Reserva', 'Data Execucao', 'Nome_Servico', 'Valor_Servico', 'Desconto_Global']]
-
-    df_sales_filtrado = df_sales_filtrado.rename(columns={'Cod_Reserva': 'Reserva', 'Nome_Servico': 'Servico', 'Valor_Servico': 'Valor Venda', 'Desconto_Global': 'Desconto Reserva'})
+    df_sales_filtrado = st.session_state.df_sales.rename(columns={'Cod_Reserva': 'Reserva', 'Nome_Servico': 'Servico', 'Valor_Servico': 'Valor Venda', 'Desconto_Global': 'Desconto Reserva'})
 
     df_escalas_group_bg_4x4 = pd.merge(df_escalas_group_bg_4x4, df_sales_filtrado, on=['Reserva', 'Servico'], how='left')
 
