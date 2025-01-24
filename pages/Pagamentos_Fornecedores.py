@@ -470,6 +470,37 @@ def criar_output_html_email(nome_html, html, guia, soma_servicos):
 
         file.write(f'<p style="font-size:30px;">Data de Pagamento: {st.session_state.data_pagamento.strftime("%d/%m/%Y")}</p>')
 
+def inserir_valor_servico_desconto(df_escalas_group_bg_4x4):
+
+    df_sales_filtrado = st.session_state.df_sales[['Cod_Reserva', 'Data Execucao', 'Nome_Servico', 'Valor_Servico', 'Desconto_Global']]
+
+    df_sales_filtrado = df_sales_filtrado.rename(columns={'Cod_Reserva': 'Reserva', 'Nome_Servico': 'Servico', 'Valor_Servico': 'Valor Venda', 'Desconto_Global': 'Desconto Reserva'})
+
+    df_escalas_group_bg_4x4 = pd.merge(df_escalas_group_bg_4x4, df_sales_filtrado, on=['Reserva', 'Servico'], how='left')
+
+    return df_escalas_group_bg_4x4
+
+def precificar_flor_das_trilhas(df_escalas_group_bg_4x4):
+
+    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Valor Venda'] = 700
+
+    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Desconto Reserva'] = 0
+
+    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Venda Líquida de Desconto'] = 700
+
+    return df_escalas_group_bg_4x4
+
+def gerar_df_pag_final_forn_bg_4x4():
+    
+    st.session_state.df_pag_final_forn_bg_4x4 = df_escalas_group_bg_4x4[['Data da Escala', 'Reserva', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Valor Venda', 
+                                                                         'Desconto Reserva', 'Venda Líquida de Desconto', 'Valor Net', 'Valor Final']]
+    
+    st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'] = pd.to_datetime(st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'])
+
+    st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'] = st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'].dt.strftime('%d/%m/%Y')
+
+    st.session_state.df_pag_final_forn_bg_4x4 = st.session_state.df_pag_final_forn_bg_4x4.drop_duplicates().reset_index(drop=True)
+
 st.set_page_config(layout='wide')
 
 if not 'base_luck' in st.session_state:
@@ -668,42 +699,38 @@ if gerar_mapa:
 
     df_escalas_group_bg_4x4 = df_escalas_bg_4x4.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Tipo Veiculo', 'Servico', 'Tipo de Servico', 'Fornecedor Motorista', 'Motorista'])\
         .agg({'Total ADT': 'sum', 'Total CHD': 'sum', 'Reserva': transformar_em_string}).reset_index()
+    
+    # Inserindo valor do serviço e desconto
 
-    df_sales_filtrado = st.session_state.df_sales[['Cod_Reserva', 'Data Execucao', 'Nome_Servico', 'Valor_Servico', 'Desconto_Global']]
-
-    df_sales_filtrado = df_sales_filtrado.rename(columns={'Cod_Reserva': 'Reserva', 'Nome_Servico': 'Servico', 'Valor_Servico': 'Valor Venda', 
-                                                        'Desconto_Global': 'Desconto Reserva'})
-
-    df_escalas_group_bg_4x4 = pd.merge(df_escalas_group_bg_4x4, df_sales_filtrado, on=['Reserva', 'Servico'], how='left')
+    df_escalas_group_bg_4x4 = inserir_valor_servico_desconto(df_escalas_group_bg_4x4)
 
     # Verificando se todos os serviços estão tarifados
 
     verificar_tarifarios(df_escalas_group_bg_4x4, st.session_state.id_gsheet, 'Tarifário Buggy e 4x4', st.session_state.df_tarifario_bg_4x4)
 
+    # Inserindo valores net
+
     df_escalas_group_bg_4x4 = pd.merge(df_escalas_group_bg_4x4, st.session_state.df_tarifario_bg_4x4, on='Servico', how='left')
+
+    # Eliminando valores de desconto maiores que o valor da venda
 
     df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Desconto Reserva']>df_escalas_group_bg_4x4['Valor Venda'], 'Desconto Reserva'] = 0
 
+    # Calculando venda líquida de desconto * 70%
+
     df_escalas_group_bg_4x4['Venda Líquida de Desconto'] = (df_escalas_group_bg_4x4['Valor Venda']-df_escalas_group_bg_4x4['Desconto Reserva'])*0.7
 
-    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Valor Venda'] = 700
+    # Ajustando valor de flor das trilhas p/ 700
 
-    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Desconto Reserva'] = 0
+    df_escalas_group_bg_4x4 = precificar_flor_das_trilhas(df_escalas_group_bg_4x4)
 
-    df_escalas_group_bg_4x4.loc[df_escalas_group_bg_4x4['Veiculo']=='FLOR DA TRILHA', 'Venda Líquida de Desconto'] = 700
+    # Escolhendo entre valor net e venda líquida de desconto p/ gerar valor de pagamento
 
     df_escalas_group_bg_4x4['Valor Final'] = df_escalas_group_bg_4x4.apply(lambda row: row['Valor Net'] if row['Venda Líquida de Desconto']>row['Valor Net'] else row['Venda Líquida de Desconto'], 
                                                                            axis=1)
     
-    st.session_state.df_pag_final_forn_bg_4x4 = df_escalas_group_bg_4x4[['Data da Escala', 'Reserva', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Valor Venda', 
-                                                                         'Desconto Reserva', 'Venda Líquida de Desconto', 'Valor Net', 'Valor Final']]
+    gerar_df_pag_final_forn_bg_4x4()
     
-    st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'] = pd.to_datetime(st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'])
-
-    st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'] = st.session_state.df_pag_final_forn_bg_4x4['Data da Escala'].dt.strftime('%d/%m/%Y')
-
-    st.session_state.df_pag_final_forn_bg_4x4 = st.session_state.df_pag_final_forn_bg_4x4.drop_duplicates().reset_index(drop=True)
-
 if 'df_pag_final_forn' in st.session_state:
 
     st.header('Gerar Mapas')
