@@ -356,7 +356,7 @@ def preencher_colunas_df(df_apoios_group):
 
     df_apoios_group['Est. Origem']=''
 
-    df_apoios_group[['Valor']]=27
+    df_apoios_group[['Valor']]=27.5
 
     df_apoios_group[['Acréscimo Motoguia', 'Desconto por Junção', 'Valor Total']]=0
 
