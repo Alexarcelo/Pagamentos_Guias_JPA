@@ -7,9 +7,6 @@ from datetime import timedelta, time
 from babel.numbers import format_currency
 import gspread 
 import requests
-from google.cloud import secretmanager 
-import json
-from google.oauth2.service_account import Credentials
 from google.oauth2 import service_account
 
 def gerar_df_phoenix(vw_name):
@@ -54,7 +51,7 @@ def puxar_dados_phoenix():
     
     st.session_state.df_escalas['Guia'] = st.session_state.df_escalas['Guia'].fillna('')
 
-def puxar_tarifarios(id_gsheet):
+def puxar_aba_simples(id_gsheet, nome_aba, nome_df):
 
     nome_credencial = st.secrets["CREDENCIAL_SHEETS"]
     credentials = service_account.Credentials.from_service_account_info(nome_credencial)
@@ -64,13 +61,33 @@ def puxar_tarifarios(id_gsheet):
 
     spreadsheet = client.open_by_key(id_gsheet)
     
-    sheet = spreadsheet.worksheet('Tarifario')
+    sheet = spreadsheet.worksheet(nome_aba)
 
     sheet_data = sheet.get_all_values()
 
-    st.session_state.df_tarifario = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+    st.session_state[nome_df] = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
 
-    st.session_state.df_tarifario['Valor'] = pd.to_numeric(st.session_state.df_tarifario['Valor'], errors='coerce')
+def tratar_colunas_df(df):
+
+    for coluna in df.columns:
+
+        if not coluna in ['Servico', 'Modo', 'Tipo do Servico', 'Configuração', 'Parâmetro']:
+
+            df[coluna] = (df[coluna].str.replace('.', '', regex=False).str.replace(',', '.', regex=False))
+
+            df[coluna] = pd.to_numeric(df[coluna])
+
+def puxar_tarifarios():
+
+    puxar_aba_simples(st.session_state.id_gsheet, 'Tarifario', 'df_tarifario')
+
+    tratar_colunas_df(st.session_state.df_tarifario)
+
+def puxar_configuracoes():
+
+    puxar_aba_simples(st.session_state.id_gsheet, 'Configurações Guias', 'df_config')
+
+    tratar_colunas_df(st.session_state.df_config)
 
 def agrupar_por_escala():
 
@@ -195,19 +212,19 @@ def calcular_acrescimo_motoguia(df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tou
 
     return df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour
 
-def ajustar_pag_giuliano_junior_neto_tt(df):
+def ajustar_pag_giuliano_junior_neto(df):
 
-    mask_pag_herbet = (df['Guia'].isin(['HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<150) | (pd.isna(df['Valor Total'])))
-    
-    df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
+    df_acordo_motoguias = st.session_state.df_config[st.session_state.df_config['Configuração']=='Acordo Motoguias'].reset_index(drop=True)
 
-    mask_pag_junior_giuliano = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
+    for index in range(len(df_acordo_motoguias)):
 
-    df.loc[mask_pag_junior_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+        motoguia = df_acordo_motoguias.at[index, 'Parâmetro']
 
-    mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
+        valor_ajuste = df_acordo_motoguias.at[index, 'Valor Parâmetro']
 
-    df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [350, 0, 350]
+        mask_motoguia = (df['Guia']==motoguia) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<valor_ajuste) | (pd.isna(df['Valor Total'])))
+
+        df.loc[mask_motoguia, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [valor_ajuste, 0, valor_ajuste]
     
     return df
 
@@ -290,28 +307,19 @@ def criar_coluna_valor_total(df):
 
     return df
 
-def ajustar_pag_giuliano_junior_neto_in_out(df):
+def ajustar_valor_transferistas(df_pag_guias_in_out_final):
 
-    mask_pag_herbet = (df['Guia'].isin(['HERBET - GUIA'])) & (df['Acréscimo Motoguia']!=0) & \
-        ((df['Valor Total']<150) | (pd.isna(df['Valor Total'])))
-    
-    df.loc[mask_pag_herbet, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [150, 0, 150]
+    df_acordo_transferistas = st.session_state.df_config[st.session_state.df_config['Configuração']=='Acordo Transferistas'].reset_index(drop=True)
 
-    mask_pag_junior_giuliano = (df['Guia'].isin(['GIULIANO - GUIA', 'JUNIOR - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<270) | (pd.isna(df['Valor Total'])))
+    for index in range(len(df_acordo_transferistas)):
 
-    df.loc[mask_pag_junior_giuliano, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [270, 0, 270]
+        transferista = df_acordo_transferistas.at[index, 'Parâmetro']
 
-    mask_pag_neto = (df['Guia'].isin(['NETO VIANA - GUIA'])) & (df['Acréscimo Motoguia']!=0) & ((df['Valor Total']<350) | (pd.isna(df['Valor Total'])))
+        valor_ajuste = df_acordo_transferistas.at[index, 'Valor Parâmetro']
 
-    df.loc[mask_pag_neto, ['Valor', 'Acréscimo Motoguia', 'Valor Total']] = [350, 0, 350]
+        mask_transferistas = (df_pag_guias_in_out_final['Guia']==transferista) & (df_pag_guias_in_out_final['Valor']<valor_ajuste)
 
-    return df
-
-def ajustar_valor_transferistas(df_pag_guias_in_out_final, transferistas):
-
-    mask_transferistas = (df_pag_guias_in_out_final['Guia'].isin(transferistas)) & (df_pag_guias_in_out_final['Valor']<85)
-
-    df_pag_guias_in_out_final.loc[mask_transferistas, ['Valor', 'Acréscimo Motoguia']] = [85, 0]
+        df_pag_guias_in_out_final.loc[mask_transferistas, ['Valor', 'Acréscimo Motoguia']] = [valor_ajuste, 0]
 
     return df_pag_guias_in_out_final
 
@@ -356,7 +364,7 @@ def preencher_colunas_df(df_apoios_group):
 
     df_apoios_group['Est. Origem']=''
 
-    df_apoios_group[['Valor']]=27.5
+    df_apoios_group[['Valor']]=st.session_state.df_config[st.session_state.df_config['Configuração']=='Valor Apoio']['Valor Parâmetro'].iloc[0]
 
     df_apoios_group[['Acréscimo Motoguia', 'Desconto por Junção', 'Valor Total']]=0
 
@@ -613,6 +621,12 @@ with row1[0]:
 
     data_final = container_datas.date_input('Data Final', value=None ,format='DD/MM/YYYY', key='data_final')
 
+    row1_2=container_datas.columns(2)
+
+    with row1_2[0]:
+
+        gerar_mapa = st.button('Gerar Mapa de Pagamentos')
+
 # Atualizar Dados Phoenix
 
 with row1[1]:
@@ -635,145 +649,128 @@ st.divider()
 
 if data_final and data_inicial:
 
-    # Seleção de transferistas
+    if gerar_mapa:
 
-    with row1[1]:
+        with st.spinner('Puxando tarifários, configurações...'):
 
-        lista_guias = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final) & 
-                                                  (st.session_state.df_escalas['Guia'] != '')]['Guia'].unique()
+            puxar_tarifarios()
 
-        container_transferistas = st.container(border=True)
+            puxar_configuracoes()
 
-        transferistas = container_transferistas.multiselect('Selecione os transferistas', sorted(lista_guias), default=None)
+        with st.spinner('Gerando mapas de pagamentos...'):
 
-    if transferistas:
+            # Agrupando por escala
 
-        row1_2=container_datas.columns(2)
+            df_escalas_group = agrupar_por_escala()
 
-        with row1_2[0]:
+            # Gerando dataframes específicos por tarifa
 
-            gerar_mapa = st.button('Gerar Mapa de Pagamentos')
+            df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour, df_escalas_in_out = gerar_dataframes_base(df_escalas_group)
 
-        if gerar_mapa:
+            # Verificando serviços não tarifados
 
-            with st.spinner('Puxando tarifários do Google Drive...'):
+            lista_add_servicos = verificar_tarifarios_tt(df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour, st.session_state.id_gsheet, 'Tarifario')
 
-                puxar_tarifarios(st.session_state.id_gsheet)
+            # Gerando dataframes com valores tarifados
 
-            with st.spinner('Gerando mapas de pagamentos...'):
+            df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour = colocar_valores_em_dataframes(df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour)
 
-                # Agrupando por escala
+            # Calculando acréscimo motoguia
 
-                df_escalas_group = agrupar_por_escala()
+            df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour = calcular_acrescimo_motoguia(df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour)
 
-                # Gerando dataframes específicos por tarifa
+            # Concatenando 'df_pag_guias_reg_tour', 'df_pag_guias_pvt_tour' e 'df_pag_guias_pvt_tour_bara' em um único dataframe
 
-                df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour, df_escalas_in_out = gerar_dataframes_base(df_escalas_group)
+            df_pag_guias_tour_total = pd.concat([df_pag_guias_reg_tour, df_pag_guias_pvt_tour, df_pag_guias_pvt_tour_bara], ignore_index=True)
 
-                # Verificando serviços não tarifados
+            # Criando coluna de Valor Total e ordenando por Guia e Data da Escala
 
-                lista_add_servicos = verificar_tarifarios_tt(df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour, st.session_state.id_gsheet, 'Tarifario')
+            df_pag_guias_tour_total = criar_coluna_valor_total(df_pag_guias_tour_total)
 
-                # Gerando dataframes com valores tarifados
+            df_pag_guias_tour_total = df_pag_guias_tour_total.sort_values(by = ['Guia', 'Data da Escala']).reset_index(drop=True)
 
-                df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour = colocar_valores_em_dataframes(df_escalas_pvt_tour_bara, df_escalas_pvt_tour, df_escalas_reg_tour)
+            # Deixando apenas BA´RA HOTEL na coluna Est. Origem quando o serviço não for regular
 
-                # Calculando acréscimo motoguia
+            df_pag_guias_tour_total.loc[(df_pag_guias_tour_total['Est. Origem'] != 'BA´RA HOTEL') | (df_pag_guias_tour_total['Modo'] == 'REGULAR'), 'Est. Origem'] = ''
+            
+            # Ajustando pagamento de Giuliano, Junior e Neto
 
-                df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour = calcular_acrescimo_motoguia(df_pag_guias_pvt_tour_bara, df_pag_guias_pvt_tour, df_pag_guias_reg_tour)
+            df_pag_guias_tour_total = ajustar_pag_giuliano_junior_neto(df_pag_guias_tour_total)
 
-                # Concatenando 'df_pag_guias_reg_tour', 'df_pag_guias_pvt_tour' e 'df_pag_guias_pvt_tour_bara' em um único dataframe
+            # Criando colunas com horários de voos mais tarde e mais cedo
 
-                df_pag_guias_tour_total = pd.concat([df_pag_guias_reg_tour, df_pag_guias_pvt_tour, df_pag_guias_pvt_tour_bara], ignore_index=True)
+            df_escalas_in_out = colunas_voos_mais_tarde_cedo(df_escalas_in_out)
 
-                # Criando coluna de Valor Total e ordenando por Guia e Data da Escala
+            # Identificando voos diurnos e na madrugada
 
-                df_pag_guias_tour_total = criar_coluna_valor_total(df_pag_guias_tour_total)
+            df_escalas_in_out['Diurno / Madrugada'] = df_escalas_in_out.apply(lambda row: 'MADRUGADA' if (row['Horario Apresentacao']<=time(4,0)) or 
+                                                                                (row['Horario Voo Mais Tarde']<=time(4)) else 'DIURNO', axis=1)
+            
+            # Separando diurnos e madrugadas jpa e interestadual
 
-                df_pag_guias_tour_total = df_pag_guias_tour_total.sort_values(by = ['Guia', 'Data da Escala']).reset_index(drop=True)
+            df_escalas_in_out_jpa_diurno, df_escalas_in_out_jpa_madrugada, df_escalas_in_out_interestadual = gerar_df_in_out_jpa_interestadual(df_escalas_in_out)
 
-                # Deixando apenas BA´RA HOTEL na coluna Est. Origem quando o serviço não for regular
+            # Gerar dataframes de pagamentos de transfers
 
-                df_pag_guias_tour_total.loc[(df_pag_guias_tour_total['Est. Origem'] != 'BA´RA HOTEL') | (df_pag_guias_tour_total['Modo'] == 'REGULAR'), 'Est. Origem'] = ''
-                
-                # Ajustando pagamento de Giuliano, Junior e Neto
+            df_pag_guias_in_out_jpa_diurno, df_pag_guias_in_out_jpa_madrugada, df_pag_guias_in_out_interestadual = gerar_df_pag_in_out(df_escalas_in_out_jpa_diurno, df_escalas_in_out_jpa_madrugada, 
+                                                                                                                                    df_escalas_in_out_interestadual)
+            
+            # Concatenando todos os dataframes de pagamento de transfers
 
-                df_pag_guias_tour_total = ajustar_pag_giuliano_junior_neto_tt(df_pag_guias_tour_total)
+            df_pag_guias_in_out = pd.concat([df_pag_guias_in_out_jpa_diurno, df_pag_guias_in_out_jpa_madrugada, df_pag_guias_in_out_interestadual], ignore_index=True)
 
-                # Criando colunas com horários de voos mais tarde e mais cedo
+            # Diminuindo 1 dia dos OUTs da madrugada, mas que tem horário no final do dia anterior
 
-                df_escalas_in_out = colunas_voos_mais_tarde_cedo(df_escalas_in_out)
+            df_pag_guias_in_out.loc[(df_pag_guias_in_out['Tipo de Servico']=='OUT') & (df_pag_guias_in_out['Diurno / Madrugada']=='MADRUGADA') & 
+                                    (df_pag_guias_in_out['Horario Apresentacao']>time(4)), 'Data | Horario Apresentacao'] = \
+                                        df_pag_guias_in_out.loc[(df_pag_guias_in_out['Tipo de Servico']=='OUT') & (df_pag_guias_in_out['Diurno / Madrugada']=='MADRUGADA') & 
+                                                                (df_pag_guias_in_out['Horario Apresentacao']>time(4)), 'Data | Horario Apresentacao'] - timedelta(days=1)
+            
+            # Ordenando por 'Guia', 'Motorista', 'Veiculo', 'Data | Horario Apresentacao'
 
-                # Identificando voos diurnos e na madrugada
+            df_pag_guias_in_out = df_pag_guias_in_out.sort_values(by = ['Guia', 'Motorista', 'Veiculo', 'Data | Horario Apresentacao']).reset_index(drop=True)
 
-                df_escalas_in_out['Diurno / Madrugada'] = df_escalas_in_out.apply(lambda row: 'MADRUGADA' if (row['Horario Apresentacao']<=time(4,0)) or 
-                                                                                  (row['Horario Voo Mais Tarde']<=time(4)) else 'DIURNO', axis=1)
-                
-                # Separando diurnos e madrugadas jpa e interestadual
+            # Calculando acréscimo motoguia
 
-                df_escalas_in_out_jpa_diurno, df_escalas_in_out_jpa_madrugada, df_escalas_in_out_interestadual = gerar_df_in_out_jpa_interestadual(df_escalas_in_out)
+            df_pag_guias_in_out = gerar_pag_motoguia(df_pag_guias_in_out)
 
-                # Gerar dataframes de pagamentos de transfers
+            # Ajustando valor mínimo de transferistas
 
-                df_pag_guias_in_out_jpa_diurno, df_pag_guias_in_out_jpa_madrugada, df_pag_guias_in_out_interestadual = gerar_df_pag_in_out(df_escalas_in_out_jpa_diurno, df_escalas_in_out_jpa_madrugada, 
-                                                                                                                                        df_escalas_in_out_interestadual)
-                
-                # Concatenando todos os dataframes de pagamento de transfers
+            df_pag_guias_in_out = ajustar_valor_transferistas(df_pag_guias_in_out)
 
-                df_pag_guias_in_out = pd.concat([df_pag_guias_in_out_jpa_diurno, df_pag_guias_in_out_jpa_madrugada, df_pag_guias_in_out_interestadual], ignore_index=True)
+            # Verificando junções de OUTs e INs
 
-                # Diminuindo 1 dia dos OUTs da madrugada, mas que tem horário no final do dia anterior
+            df_pag_guias_in_out_final = verificar_juncoes_in_out(df_pag_guias_in_out)
 
-                df_pag_guias_in_out.loc[(df_pag_guias_in_out['Tipo de Servico']=='OUT') & (df_pag_guias_in_out['Diurno / Madrugada']=='MADRUGADA') & 
-                                        (df_pag_guias_in_out['Horario Apresentacao']>time(4)), 'Data | Horario Apresentacao'] = \
-                                            df_pag_guias_in_out.loc[(df_pag_guias_in_out['Tipo de Servico']=='OUT') & (df_pag_guias_in_out['Diurno / Madrugada']=='MADRUGADA') & 
-                                                                    (df_pag_guias_in_out['Horario Apresentacao']>time(4)), 'Data | Horario Apresentacao'] - timedelta(days=1)
-                
-                # Ordenando por 'Guia', 'Motorista', 'Veiculo', 'Data | Horario Apresentacao'
+            # Criando coluna de Valor Total
 
-                df_pag_guias_in_out = df_pag_guias_in_out.sort_values(by = ['Guia', 'Motorista', 'Veiculo', 'Data | Horario Apresentacao']).reset_index(drop=True)
+            df_pag_guias_in_out_final = criar_coluna_valor_total(df_pag_guias_in_out_final)
 
-                # Calculando acréscimo motoguia
+            # Reordenando por 'Guia', 'Data da Escala'
 
-                df_pag_guias_in_out = gerar_pag_motoguia(df_pag_guias_in_out)
+            df_pag_guias_in_out_final = df_pag_guias_in_out_final.sort_values(by = ['Guia', 'Data da Escala']).reset_index(drop=True)
 
-                # Ajustando valor mínimo de transferistas
+            # Ajustando pagamentos de Giuliano, Junior e Neto
 
-                df_pag_guias_in_out = ajustar_valor_transferistas(df_pag_guias_in_out, transferistas)
+            df_pag_guias_in_out_final = ajustar_pag_giuliano_junior_neto(df_pag_guias_in_out_final)
 
-                # Verificando junções de OUTs e INs
+            # Ajustando colunas pra depois concatenar
 
-                df_pag_guias_in_out_final = verificar_juncoes_in_out(df_pag_guias_in_out)
+            df_pag_guias_tour_total, df_pag_guias_in_out_final = ajustar_colunas_tt_in_out_final(df_pag_guias_tour_total, df_pag_guias_in_out_final)
 
-                # Criando coluna de Valor Total
+            # Criando Apoios
 
-                df_pag_guias_in_out_final = criar_coluna_valor_total(df_pag_guias_in_out_final)
+            df_pag_apoios = criar_df_apoios()
 
-                # Reordenando por 'Guia', 'Data da Escala'
+            # Juntando tudo em um dataframe só
+            
+            df_pag_final = pd.concat([df_pag_guias_tour_total, df_pag_guias_in_out_final, df_pag_apoios], ignore_index=True)
 
-                df_pag_guias_in_out_final = df_pag_guias_in_out_final.sort_values(by = ['Guia', 'Data da Escala']).reset_index(drop=True)
+            # Renomeando as colunas
 
-                # Ajustando pagamentos de Giuliano, Junior e Neto
+            df_pag_final = df_pag_final.rename(columns={'Tipo de Servico': 'Tipo', 'Servico': 'Serviço', 'Est. Origem': 'Hotel', 'Veiculo': 'Veículo'})
 
-                df_pag_guias_in_out_final = ajustar_pag_giuliano_junior_neto_in_out(df_pag_guias_in_out_final)
-
-                # Ajustando colunas pra depois concatenar
-
-                df_pag_guias_tour_total, df_pag_guias_in_out_final = ajustar_colunas_tt_in_out_final(df_pag_guias_tour_total, df_pag_guias_in_out_final)
-
-                # Criando Apoios
-
-                df_pag_apoios = criar_df_apoios()
-
-                # Juntando tudo em um dataframe só
-                
-                df_pag_final = pd.concat([df_pag_guias_tour_total, df_pag_guias_in_out_final, df_pag_apoios], ignore_index=True)
-
-                # Renomeando as colunas
-
-                df_pag_final = df_pag_final.rename(columns={'Tipo de Servico': 'Tipo', 'Servico': 'Serviço', 'Est. Origem': 'Hotel', 'Veiculo': 'Veículo'})
-
-                st.session_state.df_pag_final = df_pag_final
+            st.session_state.df_pag_final = df_pag_final
 
 if 'df_pag_final' in st.session_state:
 
