@@ -24,7 +24,7 @@ def gerar_df_phoenix(vw_name, base_luck):
     cursor = conexao.cursor()
 
     if vw_name=='vw_sales':
-        request_name = f'SELECT `Cod_Reserva`, `Data Execucao`, `Nome_Servico`, `Valor_Servico`, `Desconto_Global` FROM {vw_name}'
+        request_name = f'SELECT `Cod_Reserva`, `Data Execucao`, `Nome_Servico`, `Valor_Servico`, `Desconto_Global`, `Data_Servico` FROM {vw_name}'
     else:
         request_name = f'SELECT * FROM {vw_name}'
         
@@ -646,6 +646,8 @@ if gerar_mapa:
                                                 (~st.session_state.df_escalas['Veiculo'].isin(list(filter(lambda x: x != '', st.session_state.df_config['Frota'].tolist())))) & 
                                                 (~st.session_state.df_escalas['Servico'].isin(list(filter(lambda x: x != '', st.session_state.df_config['Excluir Servicos'].tolist()))))]\
                                                 .reset_index(drop=True)
+    
+    
 
     # Transformando Data | Horario Apresentacao dos INs como Data | Horario Voo
 
@@ -660,39 +662,45 @@ if gerar_mapa:
 
     df_escalas_sem_buggy_4x4 = df_escalas[~df_escalas['Tipo Veiculo'].isin(['Buggy', '4X4'])].reset_index(drop=True)
 
-    # Agrupando escalas
+    if len(df_escalas_sem_buggy_4x4)>0:
 
-    df_escalas_group = df_escalas_sem_buggy_4x4.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Tipo Veiculo', 'Servico', 'Tipo de Servico', 'Fornecedor Motorista', 'Motorista'])\
-        .agg({'Horario Voo': 'first', 'Data | Horario Apresentacao': 'max', 'Total ADT': 'sum', 'Total CHD': 'sum'}).reset_index()
+        # Agrupando escalas
 
-    # Adicionando apoios no dataframe
+        df_escalas_group = df_escalas_sem_buggy_4x4.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Tipo Veiculo', 'Servico', 'Tipo de Servico', 'Fornecedor Motorista', 'Motorista'])\
+            .agg({'Horario Voo': 'first', 'Data | Horario Apresentacao': 'max', 'Total ADT': 'sum', 'Total CHD': 'sum'}).reset_index()
 
-    df_escalas_group = adicionar_apoios_em_dataframe(df_escalas_group)
-        
-    # Identificando transfers conjugados
+        # Adicionando apoios no dataframe
 
-    df_escalas_group = identificar_trf_conjugados(df_escalas_group)
+        df_escalas_group = adicionar_apoios_em_dataframe(df_escalas_group)
+            
+        # Identificando transfers conjugados
 
-    # Verificando se todos os serviços estão tarifados
+        df_escalas_group = identificar_trf_conjugados(df_escalas_group)
 
-    verificar_tarifarios(df_escalas_group, st.session_state.id_gsheet, 'Tarifário Fornecedores', st.session_state.df_tarifario)
-        
-    # Colocando valores tarifarios
-        
-    df_escalas_pag = pd.merge(df_escalas_group, st.session_state.df_tarifario, on='Servico', how='left')
+        # Verificando se todos os serviços estão tarifados
 
-    # Gerando coluna valor levando em conta o tipo de veículo usado e se é conjugado e se é CANOPUS
+        verificar_tarifarios(df_escalas_group, st.session_state.id_gsheet, 'Tarifário Fornecedores', st.session_state.df_tarifario)
+            
+        # Colocando valores tarifarios
+            
+        df_escalas_pag = pd.merge(df_escalas_group, st.session_state.df_tarifario, on='Servico', how='left')
 
-    df_escalas_pag['Valor Final'] = df_escalas_pag.apply(lambda row: row[f"{row['Tipo Veiculo']} {row['Fornecedor Motorista']}"] if row['Fornecedor Motorista']!='LUCENA CANOPUS' 
-                                                        else 50*(row['Total ADT'] + row['Total CHD']), axis=1)
+        # Gerando coluna valor levando em conta o tipo de veículo usado e se é conjugado e se é CANOPUS
 
-    # Verificando se todos os serviços da planilha estão tarifados
+        df_escalas_pag['Valor Final'] = df_escalas_pag.apply(lambda row: row[f"{row['Tipo Veiculo']} {row['Fornecedor Motorista']}"] if row['Fornecedor Motorista']!='LUCENA CANOPUS' 
+                                                            else 50*(row['Total ADT'] + row['Total CHD']), axis=1)
 
-    verificar_servicos_tarifados_sem_valor(df_escalas_pag)
+        # Verificando se todos os serviços da planilha estão tarifados
 
-    st.session_state.df_pag_final_forn = df_escalas_pag[['Data da Escala', 'Tipo de Servico', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Servico Conjugado', 'Valor Final']]
+        verificar_servicos_tarifados_sem_valor(df_escalas_pag)
 
-    st.session_state.df_pag_final_forn['Valor Final'] = st.session_state.df_pag_final_forn['Valor Final'].fillna(0)
+        st.session_state.df_pag_final_forn = df_escalas_pag[['Data da Escala', 'Tipo de Servico', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Servico Conjugado', 'Valor Final']]
+
+        st.session_state.df_pag_final_forn['Valor Final'] = st.session_state.df_pag_final_forn['Valor Final'].fillna(0)
+
+    else:
+
+        st.session_state.df_pag_final_forn = pd.DataFrame(columns=['Data da Escala', 'Tipo de Servico', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Servico Conjugado', 'Valor Final'])
 
     # Gerando df_escalas só de Buggys e 4x4
 
