@@ -122,22 +122,23 @@ if gerar_mapa:
 
     df_escalas = st.session_state.df_escalas[(st.session_state.df_escalas['Data da Escala'] >= data_inicial) & (st.session_state.df_escalas['Data da Escala'] <= data_final)].reset_index(drop=True)
 
+    df_escalas['Total Paxs'] = df_escalas[['Total ADT', 'Total CHD']].sum(axis=1)
+
     df_escalas_group = df_escalas.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Tipo Veiculo', 'Servico', 'Tipo de Servico', 'Fornecedor Motorista', 'Motorista'])\
-            .agg({'Total ADT': 'sum', 'Total CHD': 'sum'}).reset_index()
+            .agg({'Total Paxs': 'sum'}).reset_index()
 
     mask_balsa = ((df_escalas_group['Veiculo'].str.contains('MM0|FLOR')) & (df_escalas_group['Servico']=='TRILHA DOS COQUEIRAIS')) | \
         ((df_escalas_group['Tipo Veiculo']=='Buggy') & (df_escalas_group['Servico'].str.contains('NORTE|COQUEIRAIS')))
 
     df_balsa = df_escalas_group[mask_balsa].reset_index(drop=True)
 
-    df_balsa['Valor Balsa'] = df_balsa.apply(lambda row: (25.7 + (row['Total ADT'] + row['Total CHD'])*2)*2 if row['Tipo Veiculo']!='Buggy' 
-                                            else (19.2 + (row['Total ADT'] + row['Total CHD'])*2)*2, axis=1)
+    df_balsa['Valor Balsa'] = df_balsa.apply(lambda row: (25.7 + row['Total Paxs']*2)*2 if row['Tipo Veiculo']!='Buggy' else (19.2 + row['Total Paxs']*2)*2, axis=1)
     
     dict_placas = {'MM01': 'JTZ-5E73', 'MM02': 'KKL-8A07', 'MM03': 'LVP-7551', 'FLOR DA TRILHA': 'MEJ-6H90/JVY-1F80'}
     
     df_balsa['Placa Veiculo'] = df_balsa['Veiculo'].apply(lambda x: dict_placas[x] if x in dict_placas else '')
 
-    st.session_state.df_pag_final_forn = df_balsa[['Data da Escala', 'Servico', 'Motorista', 'Tipo Veiculo', 'Veiculo', 'Placa Veiculo', 'Total ADT', 'Total CHD', 'Valor Balsa']]
+    st.session_state.df_pag_final_forn = df_balsa[['Data da Escala', 'Servico', 'Motorista', 'Tipo Veiculo', 'Veiculo', 'Placa Veiculo', 'Total Paxs', 'Valor Balsa']]
     
 if 'df_pag_final_forn' in st.session_state:
 
