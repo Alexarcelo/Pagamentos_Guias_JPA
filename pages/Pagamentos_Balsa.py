@@ -125,23 +125,25 @@ if gerar_mapa:
     df_escalas_group = df_escalas.groupby(['Data da Escala', 'Escala', 'Veiculo', 'Tipo Veiculo', 'Servico', 'Tipo de Servico', 'Fornecedor Motorista', 'Motorista'])\
             .agg({'Total ADT': 'sum', 'Total CHD': 'sum'}).reset_index()
 
-    mask_balsa = ((df_escalas_group['Veiculo'].str.contains('MM0')) & (df_escalas_group['Servico']=='TRILHA DOS COQUEIRAIS')) | \
+    mask_balsa = ((df_escalas_group['Veiculo'].str.contains('MM0|FLOR')) & (df_escalas_group['Servico']=='TRILHA DOS COQUEIRAIS')) | \
         ((df_escalas_group['Tipo Veiculo']=='Buggy') & (df_escalas_group['Servico'].str.contains('NORTE|COQUEIRAIS')))
 
     df_balsa = df_escalas_group[mask_balsa].reset_index(drop=True)
 
-    df_balsa['Valor Balsa'] = df_balsa.apply(lambda row: 25.7 + (row['Total ADT'] + row['Total CHD'])*2 if row['Tipo Veiculo']!='Buggy' 
-                                            else 19.2 + (row['Total ADT'] + row['Total CHD'])*2, axis=1)
+    df_balsa['Valor Balsa'] = df_balsa.apply(lambda row: (25.7 + (row['Total ADT'] + row['Total CHD'])*2)*2 if row['Tipo Veiculo']!='Buggy' 
+                                            else (19.2 + (row['Total ADT'] + row['Total CHD'])*2)*2, axis=1)
+    
+    dict_placas = {'MM01': 'JTZ-5E73', 'MM02': 'KKL-8A07', 'MM03': 'LVP-7551', 'FLOR DA TRILHA': 'MEJ-6H90/JVY-1F80'}
+    
+    df_balsa['Placa Veiculo'] = df_balsa['Veiculo'].apply(lambda x: dict_placas[x] if x in dict_placas else '')
 
-    st.session_state.df_pag_final_forn = df_balsa[['Data da Escala', 'Servico', 'Fornecedor Motorista', 'Tipo Veiculo', 'Veiculo', 'Valor Balsa']]
+    st.session_state.df_pag_final_forn = df_balsa[['Data da Escala', 'Servico', 'Motorista', 'Tipo Veiculo', 'Veiculo', 'Placa Veiculo', 'Total ADT', 'Total CHD', 'Valor Balsa']]
     
 if 'df_pag_final_forn' in st.session_state:
 
-    df_pag_guia = st.session_state.df_pag_final_forn.sort_values(by=['Fornecedor Motorista', 'Data da Escala', 'Veiculo']).reset_index(drop=True)
+    df_pag_guia = st.session_state.df_pag_final_forn.sort_values(by=['Data da Escala', 'Veiculo']).reset_index(drop=True)
 
-    df_pag_guia['Data da Escala'] = pd.to_datetime(df_pag_guia['Data da Escala'])
-
-    df_pag_guia['Data da Escala'] = df_pag_guia['Data da Escala'].dt.strftime('%d/%m/%Y')
+    df_pag_guia['Data da Escala'] = pd.to_datetime(df_pag_guia['Data da Escala']).dt.strftime('%d/%m/%Y')
 
     total_a_pagar = df_pag_guia['Valor Balsa'].sum()
 
@@ -151,13 +153,9 @@ if 'df_pag_final_forn' in st.session_state:
 
     container_dataframe.dataframe(df_pag_guia, hide_index=True, use_container_width = True)
 
-    soma_servicos = df_pag_guia['Valor Balsa'].sum()
+    soma_servicos = format_currency(total_a_pagar, 'BRL', locale='pt_BR')
 
-    soma_servicos = format_currency(soma_servicos, 'BRL', locale='pt_BR')
-
-    for item in ['Valor Balsa']:
-
-        df_pag_guia[item] = df_pag_guia[item].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR'))
+    df_pag_guia['Valor Balsa'] = df_pag_guia['Valor Balsa'].apply(lambda x: format_currency(x, 'BRL', locale='pt_BR'))
 
     html = definir_html(df_pag_guia)
 
