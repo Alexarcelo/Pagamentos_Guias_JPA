@@ -591,6 +591,8 @@ def inserir_dataframe_gsheet(df_itens_faltantes, id_gsheet, nome_aba):
 
 st.set_page_config(layout='wide')
 
+st.session_state.view_phoenix = ''
+
 st.session_state.id_gsheet = '1GR7c8KvBtemUEAzZag742wJ4vc5Yb4IjaON_PL9mp9E'
 
 # Puxando dados do Phoenix da 'vw_payment_guide'
